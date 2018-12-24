@@ -1,0 +1,103 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DB.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Compartment.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Month.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CSM.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DB.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Compartment.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Month.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CSM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\DB\cumraindagg_winter.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\cumraineventsdagg_winter.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\DaggettMonthlyTemp.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\PETandPEV.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\rainfall&amp;AETperday.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\rainfall_winter.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\averagerainfall_winter.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\caco3withdepth.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\rain.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\TucsonAmount.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\TucsonInterval.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="..\DB\output.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\DB\CSMConfig.dat">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>
