@@ -2,17 +2,19 @@
 #include <ctime>
 
 
+
+
 //This code calculate the content and depth of pedogenic carbonate with depth
-CSM::CSM(int _numberOfYears, int _Depth, int _thick, float & rain,  float &temp, float _wieltingPoint, float _fieldCapacity, float _CCa, float _Dust)
+CSM::CSM(float rain)
 {
-	nNumOfDays = _numberOfYears * 365;
-	nDepth = _Depth;
-	thick = _thick;
-	wieltingPoint = _wieltingPoint;
-	CCa = _CCa;
+	nNumOfDays = 10000 * 365;
+	nDepth = 30;
+	thick = 5;
+	wieltingPoint = 0.039;
+	CCa = 0.122;
 	nArea = 1;
-	nFieldCapacity = _fieldCapacity;
-	nDust = _Dust;
+	nFieldCapacity = 0.0000113;
+	nDust = 0.51 / (365.0*10000.0);
 	nCaco3less = 0;
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
@@ -23,7 +25,8 @@ CSM::CSM(int _numberOfYears, int _Depth, int _thick, float & rain,  float &temp,
 	nTotalAet = 0;
 	nTotalWP = 0;
 	nTemp = 0;
-	TempArr = &temp;
+	TempArr = new float[12];
+	//TempArr[] = {10.2,11.8,14.3,18.1,22.6,27.8,30.0,28.9,26.7,20.8,14.6,10.8};
 	nLeachate = 0;
 	RainArr = &rain;
 
@@ -33,9 +36,11 @@ CSM::CSM(int _numberOfYears, int _Depth, int _thick, float & rain,  float &temp,
 
 void CSM::Calculate()
 {
-	InitCompartments();
+  InitCompartments();
+ 
+  
 	InitMonths();
-
+	printf ("Characters: %c %c \n", 'a', 65);
 	int nMonth;
 	float nTemp;
 	//main loop over days
@@ -165,7 +170,7 @@ CSM::~CSM()
 {
 	Compartments.~vector();
 	Months.~vector();
-	
+	printf ("Characters: %c %c \n", 'a', 65);
 	delete[] AET;
 }
 
@@ -183,9 +188,10 @@ void CSM::InitCompartments()
 	}
 }
 
-void CSM::InitMonths()
+NumericVector CSM::InitMonths()
 {
-	float II = 0.0;
+  NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
+  float II = 0.0;
 	float ca = 0.0;
 	float a = 0;
 	float PET = 0;
@@ -220,7 +226,10 @@ void CSM::InitMonths()
 		}
 
 		Months.push_back(Month(i, TempArr[i], panDaily, PETdaily, PET, pan));
+		returnList[i] = 20;
 	}
+	
+	return returnList;
 
 	
 
@@ -277,4 +286,12 @@ float CSM::JULIAN(int day)
 
 	julian = day - ((long)(day / 365) * 365);
 	return julian;
+}
+
+
+RCPP_MODULE(unif_module) {
+  class_<CSM>( "CSM" )
+  .constructor<int>()
+  .field( "min", &CSM::nNumOfDays )
+  ;
 }

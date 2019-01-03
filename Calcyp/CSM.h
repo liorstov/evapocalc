@@ -1,18 +1,24 @@
 #pragma once
 
+#include <Rcpp.h>
+#include <stdio.h>
 #include <vector>
 #include "Compartment.h"
 #include "Month.h"
 
-using namespace std;
-typedef enum { WINTER, SPRING, SUMMER } SEASON;
 
+using namespace std;
+using namespace Rcpp;
+
+// [[Rcpp::plugins(cpp11)]]
+
+typedef enum { WINTER, SPRING, SUMMER } SEASON;
 
 
 class CSM
 {
 public:
-	CSM(int _numberOfYears, int _Depth, int _thick, float &rain,float &temp, float _wieltingPoint,float _fieldCapacity, float _CCa, float _Dust);
+	CSM(float rain);
 	void Calculate();
 	std::vector<Compartment>* GetCompartments();
 	~CSM();
@@ -30,10 +36,11 @@ public:
 	float nTotalAet;
 	float nTotalWP;
 	float nTotalWhc;
+	NumericVector InitMonths();
+	
+	
 
-private:
 	void InitCompartments();
-	void InitMonths();
 	MONTH GetMonth(int nDay);
 	float JULIAN(int day);
 
@@ -54,7 +61,17 @@ private:
 	float nTemp;
 	float nLeachate;
 
-	double CO2[10] = { 3.79e-4,6.87e-4,9.76e-4,1.28e-3,1.60e-3, 1.91e-3,2.14e-3,2.27e-3,2.41e-3,2.54e-3 };
+	double CO2[10] = { 3.79e-4,6.87e-4,9.76e-4,1.28e-3,1.60e-3, 1.91e-3,2.14e-3,2.27e-3,2.41e-3,2.54e-3  };
 	double CO2Mul[12] = { 1,1,1.588,1.588,1.588,1.588,1.588,1.588,1.588,1.588,1,1 };
 };
+
+RCPP_MODULE(CSM_MODULE) {
+  class_<CSM>( "CSM" )
+  .constructor<float>()
+  
+  .method( "Calculate", &CSM::Calculate,
+  "Docstring for stats")
+  .method("InitMonths", &CSM::InitMonths, "desc")
+
+  ;}
 
