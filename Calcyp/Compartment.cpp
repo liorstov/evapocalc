@@ -1,18 +1,19 @@
 #include "Compartment.h"
 #include "math.h"
 
-Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CO2)
+Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CSO4)
 {
 	this->nIndex = Index;
 	this->nThetaWeildingPnt = wieldingpoint;
-	this->nWhc = fieldcapacity - wieldingpoint;
-	this->nInitMoist = 0.1*thick;
-	this->nMoist = this->nInitMoist;
+	this->nFieldCapacity = fieldcapacity;
+	this->nWhc = fieldcapacity;
+	this->nMoist = 0.1*thick;
 	this->nCaCO3 = 0;
 	this->nCCa = CCa0;
-	this->nICO2 = CO2;
-	this->nSolubleCa = this->nICO2;
-	this->nTotMoist += this->nInitMoist;
+	this->C_SO4 = CSO4;
+	this->C_CaSO4 = 0;
+	//this->nICO2 = CO2;
+	//this->nSolubleCa = this->nICO2;
 	this->nTotWhc += this->nWhc*thick;
 	this->nTotThetaWP += this->nThetaWeildingPnt*thick;
 	this->nInitTotalMoist = this->nTotMoist;
@@ -75,77 +76,64 @@ float Compartment::solubility(float temp)
 {
 
 	{
-		double k1, k2, k3, k4, I, g1, g2, A, B, C, ah0, ah1, ah, aco2, ahco3, aco3, aca, ccacalc, mcacalc, mcas0, mca0, mcaeq, mcas1, mca1;
+		float I, A, k6, ionActivity, EquilConcentrationConstant,
+			CurrentConcentrationProduct, GypOmega, alphaGypsum, totalConcentrationProduct, a, b, c;
 
-		// Equilibrium constants for the carbonate-bicarbonate system as a function of temprature
-		// Notation given by MArion et al. (1985)
-		k1 = pow(10, -1.14 - (0.0131*temp)); // eq. 5
-		k2 = pow(10, -6.54 + (0.0071*temp)); // eq. 7
-		k3 = pow(10, -10.59 + (0.0102*temp)); // eq. 9
-		k4 = pow(10, -7.96 - (0.0125*temp)); // eq. 11
+		 k6 = pow(10, -2.23 - (0.0019*temp));
 
 											 // Ionic strength
-		I = 3 * nCCa; // eq. 14. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
+		I = 0.5*(nCCa*4+C_SO4*4); // eq. 14. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
+		A = 0.4918 + (6.6098 * pow(10, -4) * temp) + (5.0231 * pow(10, -6) * pow(temp, 2));
+		ionActivity = pow(10, -A * 4 * (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
+		
+		// check if percipitating
+		EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
+		CurrentConcentrationProduct = nCCa * C_SO4;
 
-					 // Activity coefficients for ionic valences of 1 and 2
-		g1 = pow(10, -0.505*(sqrt(I) / (1 + sqrt(I)) - (0.3*I))); // eq. 13
-		g2 = pow(10, -0.505 * 4 * (sqrt(I) / (1 + sqrt(I)) - (0.3*I))); // eq. 13
+		// omega is the difference between current product and equil product
+		GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
+		totalConcentrationProduct = nCCa * C_SO4;
 
-																		// Hydrogen ion activity
-		A = 2 * k4 / (g2*k3*k2*k1*nCO2); // Left term in eq. 16
-		B = k1*k2*nCO2 / g1; // Middle term in eq. 16
-		C = 2 * k1*k2*k3*nCO2 / g2; // Right term in eq. 16
+		// the concentration we need to add or substract to gypsum
+		alphaGypsum = 0;
+		
 
-									// Newton's method for solving eq. 16
-		ah0 = pow(10, -8); // ph=8 intial guess
-		ah1 = pow(10, -4); // 
-		while (fabs(-1 * log(ah1) + log(ah0))>0.1)
+		// check if  percipitation occurs
+		if (GypOmega >= 0 ) 
 		{
-			ah0 = ah1;
-			ah1 = ah0 - ((A*pow(ah0, 4) - (B*ah0) - C) / ((4 * A*pow(ah0, 3)) - B));
+			// solving polinum
+			a = 1;
+			b = -(nCCa + C_SO4);
+			c = (CurrentConcentrationProduct - GypOmega);
+			alphaGypsum = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+			nCCa -= alphaGypsum;
+			C_SO4 -= alphaGypsum;
+			C_CaSO4 += alphaGypsum;			
 		}
-		ah = ah1;
-
-		// Equalibrium activities of CO2, HCO3, CO3, and Ca
-		aco2 = k1*nCO2; // eq. 4
-		ahco3 = k2*aco2 / ah; // eq. 6
-		aco3 = k3*ahco3 / ah; // eq. 8
-		aca = k4 / aco3; // eq. 10
-
-						 // Ca concentration in [mol/L] or [M]
-		ccacalc = aca / g2; // eq. 12
-
-							// Determination of final grams of CaCO3 and Ca in solution within a compartment
-
-							// Ca in solution in compartment volume [g]
-		mcacalc = ccacalc*40.1*nMoist*nArea / 1000; // molar mass of Ca is 40.1 [g/mol], moist is the water amount in [cm] of the compartment, area is in [cm^2], and dividing by 1000 is to transfer from Liter to cm^3
-
-												  // Ca in the soil phase in compartment volume [g/cm^3]
-		mcas0 = nCaCO3 / 100.1*40.1*nthick*nArea; // molar mass of CaCO3 is 100.1 [g/mol]
-
-												// Initial Ca in solution in compartment volume [g]
-												// percolating from upper compartment + same compartment previous time step
-		mca0 = nCCa*40.1*nMoist / 1000 * nArea; // similar to calculating mcacalc
-
-											 // Ca needed in solution to reach equilibrium [g]		
-		mcaeq = mcacalc - mca0;
-
-		// Difference in Ca between Ca in soil phase to Ca in solution [g]
-		mcas1 = mcas0 - mcaeq;
-
-		if (mcas1 >= 0) mca1 = mcacalc; // There is enough Ca in solution to reach equilibrium
-		else						   // There is not enough Ca in solution to reach equilibrium	
-		{
-			mca1 = mca0 + mcas0; // Ca in solution equals Ca from solid + Ca from intial solution
-			mcas1 = 0;
+		// gypsum dissolution
+		else {
+			a = 1;
+			b = (nCCa + C_SO4);
+			c = (CurrentConcentrationProduct + GypOmega);
+			alphaGypsum = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+			nCCa += alphaGypsum;
+			C_SO4 += alphaGypsum;
+			C_CaSO4 -= alphaGypsum;
 		}
 
+		setAllToZero();
+		
+		return C_CaSO4;
+		
+	}
+	
+}
 
-		// Conversions
-		nCaCO3 = mcas1*100.1 / 40.1 / nthick / nArea; // caco3 [g/cm3]
-		nCCa = mca1 / 40.1 / nMoist / nArea * 1000; // Ca in solution [mol/L] or [M]
-
-		return nCaCO3;
-
+void Compartment::setAllToZero()
+{
+	{
+		if (nCCa < 0) nCCa = 0;
+		if (C_SO4 < 0) C_SO4 = 0;
+		if (C_CaSO4 < 0) C_CaSO4 = 0;
 	}
 }

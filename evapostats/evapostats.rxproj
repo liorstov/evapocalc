@@ -11,6 +11,16 @@
   <PropertyGroup>
     <StartupFile>Script.R</StartupFile>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCpp1|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCppo|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='NoRCpp|AnyCPU'" />
   <ProjectExtensions>
     <VisualStudio>
       <UserProperties />

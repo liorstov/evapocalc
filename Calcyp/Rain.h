@@ -6,7 +6,7 @@ using namespace std;
 class Rain
 {
 public:
-	Rain(bool bCreateRain, int _NumberOfDays);
+	Rain(bool bCreateRain);
 
 	~Rain();
 

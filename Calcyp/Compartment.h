@@ -2,22 +2,26 @@
 class Compartment
 {
 public:
-	Compartment(int Index, int area, float wieldingpoint = 0, float fieldcapacity = 0, float thick = 0, float CCa0 = 0, float CO2 = 0);
+	Compartment(int , int, float, float, float , float , float);
 	
 	~Compartment();
-
+	
 	float PCO2(int nDay);
 	float solubility(float temp);
+	void setAllToZero();
 
 	int nIndex;
 	int nthick;
 	int nArea;
 	float nThetaWeildingPnt;
+	float nFieldCapacity;
 	float nWhc;					//water holding capacity
 	float	nInitMoist;
 	float nMoist;				// moisture level
 	float	nCaCO3;
-	float nCCa;
+	float nCCa;					//soluble Ca ion [M]
+	float C_SO4;				//solunle so4 anion [M]
+	float C_CaSO4;				//solid gypsum in Molar
 	float nICO2;
 	float nCO2;
 	float nSolubleCa;
@@ -25,6 +29,8 @@ public:
 	float	nTotWhc;			// summing the whc in the soil profile. if there are 10 compartments of 10cm each, total whc is 8.30cm
 	float	nTotThetaWP;		 //summing the wp in the soil profile. if there are 10 compartments of 10cm each, total wp is 3.9cm
 	float	nInitTotalMoist;
+	float CcaLess;
+	float CSO4Less;
 
 };
 

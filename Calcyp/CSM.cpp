@@ -5,30 +5,34 @@
 
 
 //This code calculate the content and depth of pedogenic carbonate with depth
-CSM::CSM(float rain)
+CSM::CSM(float * rain)
 {
-	nNumOfDays = 10000 * 365;
+	nNumOfDays = 1 * 100;
 	nDepth = 30;
 	thick = 5;
+	nNumOfCompatments = nDepth / thick;
 	wieltingPoint = 0.039;
-	CCa = 0.122;
+	CCa = 0.864 * pow(10, -5);
+	CSO4 = 0.144 * pow(10, -4);
+	
 	nArea = 1;
-	nFieldCapacity = 0.0000113;
+	nFieldCapacity = 0.2;
 	nDust = 0.51 / (365.0*10000.0);
-	nCaco3less = 0;
+	
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
 	nTotalCaRain = 0;
 	nTotalCaLeachate = 0;
+	nTotalSO4Leachate = 0;
 	nTotalLeachate = 0;
 	nTotalMoist = 0;
 	nTotalAet = 0;
 	nTotalWP = 0;
 	nTemp = 0;
-	TempArr = new float[12];
-	//TempArr[] = {10.2,11.8,14.3,18.1,22.6,27.8,30.0,28.9,26.7,20.8,14.6,10.8};
+	
+	
 	nLeachate = 0;
-	RainArr = &rain;
+	RainArr = rain;
 
 	AET = new float[nNumOfDays];
 
@@ -36,7 +40,7 @@ CSM::CSM(float rain)
 
 void CSM::Calculate()
 {
-  InitCompartments();
+	InitCompartments();
  
   
 	InitMonths();
@@ -48,10 +52,9 @@ void CSM::Calculate()
 	{
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
-		Compartments[0].nCO2 = Compartments[0].nICO2 * CO2Mul[nMonth];
 		 
-		nTotalCaDust += nDust;
-		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;
+		/*nTotalCaDust += nDust;
+		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= ((0.546*nTotalWhc) + nTotalWP)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
 			AET[day] = Months[(int)GetMonth(day)].PanDaily;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
 														//AET[day]=PETdaily[monthperday[day]];
@@ -62,7 +65,6 @@ void CSM::Calculate()
 			nTotalAet += AET[day];
 
 			
-		Compartments[0].nMoist = Compartments[0].nInitMoist + RainArr[day];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
 
 		if ((Compartments[0].nMoist - (Compartments[0].nThetaWeildingPnt * thick))<AET[day]) // examine if the daily AET is greater than the available water for evaporation at the 1st compartment
 		{
@@ -77,32 +79,34 @@ void CSM::Calculate()
 		// in both cases, the AET is updated: if the AET is greater than the available water for evaporation at the 1st compartment, than
 		// substract the part that was evaporated from the AET. Other wise, set AET to zero. 
 
-		Compartments[0].nCaCO3 += (nDust / thick); // add the daily dust accumulation to the 1st compartment
+		//Compartments[0].nCaCO3 += (nDust / thick); // add the daily dust accumulation to the 1st compartment
 		
 
 		if (((Compartments[0].nThetaWeildingPnt + Compartments[0].nWhc)*thick)<Compartments[0].nMoist) // examine if the updated moisture of the 1st compartment (after rainfall addition and AET substraction)
 													 // is greater than field capacity (=saturation). if yes, starts the solubility calculation
 		{
-			CCa = Compartments[0].solubility(nTemp); // calculates the carbonate solubility for the 1st compartment. ca equals to the amount of caco3 [g/cm3]
-			if (Compartments[0].nCaCO3>CCa) nCaco3less = Compartments[0].nCaCO3 - CCa; // if the caco3 in the 1st compartment is greater than the soluble caco3 (=ca) then caco3less is set to the difference between them
-			else nCaco3less = 0.0;                         // if not, caco3less is set to zero. note that caco3less is the dissolution/percipitation amount of carbonate
-			Compartments[0].nCaCO3 = Compartments[0].nCaCO3 - nCaco3less;
-			Compartments[1].nCaCO3 += nCaco3less;
+			Compartments[0].solubility(nTemp); // calculates the carbonate solubility for the 1st compartment. ca equals to the amount of caco3 [g/cm3]
+			Compartments[1].nCCa += Compartments[0].nCCa;
+			Compartments[1].C_SO4 += Compartments[0].C_SO4;
+			Compartments[0].nCCa = 0;
+			Compartments[0].C_SO4 = 0;
 		}
 
+		Compartments[0].nMoist +=RainArr[day];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
+
 		// This is the second loop that runs through the soil profile, from the 2nd compartment to the bottom
-		for (int d = 1;d < nDepth;d++)
+		for (int d = 0;d < nNumOfCompatments-2;d++)
 		{
-			// set the pco2 values to all compartments
-			Compartments[d].nCO2 = Compartments[d].nICO2 * CO2Mul[nMonth];
+			
 
 			if (Compartments[d - 1].nMoist>(Compartments[d - 1].nWhc + Compartments[d - 1].nThetaWeildingPnt)*thick)
 				nLeachate = Compartments[d - 1].nMoist - (Compartments[d - 1].nWhc + Compartments[d - 1].nThetaWeildingPnt)*thick; // determines the leachate from the upper compartment by substracting the field capacity from the moisture content
 			else nLeachate = 0.0; // if there is no excess water, then the leachate is zero
 			Compartments[d - 1].nMoist -= nLeachate; // subtract the leachate from the moisture of the upper compartment
-			Compartments[d].nMoist = Compartments[d].nInitMoist + nLeachate;    // add the leachate to the moisture of the current compartment
+			Compartments[d].nMoist = Compartments[d].nMoist + nLeachate;    // add the leachate to the moisture of the current compartment
 
-			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick)<AET[day]) // same as for the 1st compartment, taking into account the AET for this current compartment, and updating the AET value
+			// same as for the 1st compartment, taking into account the AET for this current compartment, and updating the AET value
+			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick)<AET[day]) 
 			{
 				AET[day] = AET[day] - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick));
 				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt * thick;
@@ -115,16 +119,30 @@ void CSM::Calculate()
 
 			if (((Compartments[d].nThetaWeildingPnt + Compartments[d].nWhc)*thick)<Compartments[d].nMoist) // same as for the 1st compartment, examine if we reached saturation
 			{
-				CCa = Compartments[d].solubility(nTemp);
-				if (Compartments[d].nCaCO3>CCa)
+				/*if (Compartments[d].nCaCO3>CCa)
 					nCaco3less = Compartments[d].nCaCO3 - CCa;
 				else nCaco3less = 0.0;
 				Compartments[d].nCaCO3 -= nCaco3less;
 				if (d != nDepth-1) Compartments[d + 1].nCaCO3 += nCaco3less;
-				else nTotalCaLeachate += nCaco3less;
+				else nTotalCaLeachate += nCaco3less;*/
+
+
+				Compartments[d].solubility(nTemp);
+				//wash to next compartment or to leachete
+				if (d != nNumOfCompatments - 1) {
+					Compartments[d + 1].nCCa += Compartments[d].nCCa;
+					Compartments[d + 1].C_SO4 += Compartments[d].C_SO4;
+				}
+				else
+				{
+					nTotalCaLeachate += Compartments[d].nCCa;
+					nTotalSO4Leachate += Compartments[d].C_SO4;
+				}
+				Compartments[d].nCCa = 0;
+				Compartments[d].C_SO4 = 0;
 			}
 
-			if (d == nDepth-1) // examines if we reached the compartment above the lowest one 
+			if (d == nNumOfCompatments -1) // examines if we reached the compartment above the lowest one 
 			{
 				if (AET[day]>0) nTotalAet -= AET[day];
 
@@ -143,16 +161,16 @@ void CSM::Calculate()
 
 				nTotalMoist = 0.0;
 				//pco2[d+1]=PCO2(d+1,julian,cthick);
-				for (int w = 1;w < nDepth;w++) // resert the initial soil moisture as the current soil moisture, and calculate the total moisture
+				for (int w = 1;w < nNumOfCompatments;w++) // resert the initial soil moisture as the current soil moisture, and calculate the total moisture
 				{
-					Compartments[w].nInitMoist = Compartments[w].nMoist;
-					nTotalMoist += Compartments[w].nInitMoist;
+					nTotalMoist += Compartments[w].nMoist;
 					//fprintf(fp5,"%d\t%0.3f\n",w,moist[w]);
 				}
 
-				//fprintf(fp5,"%ld\t%0.3f\t%0.3f\t%0.3f\t%0.3f\n",day,rain[day],pandaily[monthperday[day]],moisttotal,AET[day]);
 
 			}
+			printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day,RainArr[day],d, Compartments[d].nMoist, Compartments[d].C_CaSO4);
+
 
 		}
 
@@ -177,20 +195,20 @@ CSM::~CSM()
 void CSM::InitCompartments()
 {
 	Compartment *newCompartment;
-	for (int i = 0; i < nDepth; i++)
+	for (int i = 0; i < nNumOfCompatments; i++)
 	{
-		newCompartment = new Compartment(i, nArea, wieltingPoint, nFieldCapacity, thick, CCa, CO2[i]);
+		newCompartment = new Compartment(i, nArea, wieltingPoint, nFieldCapacity, thick, CCa, CSO4);
 		Compartments.push_back(*newCompartment);
 		nTotalWP += wieltingPoint * thick;
 		nTotalWhc += nFieldCapacity * thick;
-		nTotalMoist += newCompartment->nInitMoist;
+		nTotalMoist += newCompartment->nMoist;
 		nInitMoistTotal = nTotalMoist;
 	}
 }
 
-NumericVector CSM::InitMonths()
+void CSM::InitMonths()
 {
-  NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
+  //NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
   float II = 0.0;
 	float ca = 0.0;
 	float a = 0;
@@ -226,10 +244,10 @@ NumericVector CSM::InitMonths()
 		}
 
 		Months.push_back(Month(i, TempArr[i], panDaily, PETdaily, PET, pan));
-		returnList[i] = 20;
+		//returnList[i] = 20;
 	}
 	
-	return returnList;
+	//return returnList;
 
 	
 
@@ -289,9 +307,9 @@ float CSM::JULIAN(int day)
 }
 
 
-RCPP_MODULE(unif_module) {
-  class_<CSM>( "CSM" )
-  .constructor<int>()
-  .field( "min", &CSM::nNumOfDays )
-  ;
-}
+//RCPP_MODULE(unif_module) {
+//  class_<CSM>( "CSM" )
+//  .constructor<int>()
+//  .field( "min", &CSM::nNumOfDays )
+//  ;
+//}

@@ -18,11 +18,11 @@ void UI::Print()
 	if (fOutput.is_open())
 	{
 		fOutput << "time (years) = " << Handler.nNumOfDays << endl;
-		fOutput << "depth(cm)       pco2(atm)              caco3(g/cm3)		caco3(g/cm2)		caco3(g/m2)\n";
-		for (int d = 0;d < Handler.nDepth;d++)
+		fOutput << "depth(cm)				caso4(g/cm3) 				 Moist[cm]\n";
+		for (int d = 0;d < Handler.nNumOfCompatments;d++)
 		{
-			fOutput <<  (d)*Handler.thick << "\t\t" << (d+1)*Handler.thick << "\t\t" << Comp[d].nCO2 << "\t\t\t\t" << Comp[d].nCaCO3 << "\t\t" << Comp[d].nCaCO3 * Handler.thick << "\t\t\t" << Comp[d].nCaCO3* Handler.thick * 10000 << endl;
-			totalcaco3 = totalcaco3 + Comp[d].nCaCO3 * Handler.thick;
+			fOutput <<  (d)*Handler.thick <<  "\t\t\t\t" << Comp[d].C_CaSO4 << "\t\t\t\t" << Comp[d].nMoist<< endl;
+			
 		}
 
 		fOutput << "\nCa mass balance (g/cm2):\n";
