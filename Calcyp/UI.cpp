@@ -27,13 +27,13 @@ void UI::Print()
 
 		fOutput << "\nCa mass balance (g/cm2):\n";
 		fOutput << "Ca accumulation from dust		Ca accumulation from rain		Ca in soil as CaCO3		leachate Ca\n";
-		fOutput << 0.4*Handler.nTotalCaDust << "\t\t\t\t\t\t" << Handler.nTotalCaRain << "\t\t\t\t\t\t" << totalcaco3*0.4 << "\t\t\t\t\t\t" << Handler.nTotalCaLeachate*0.4 << endl;
+		fOutput << 0.4*Handler.nTotalCaDust << "\t\t\t\t\t\t" << Handler.nTotalRain << "\t\t\t\t\t\t" << totalcaco3*0.4 << "\t\t\t\t\t\t" << Handler.nTotalCaLeachate*0.4 << endl;
 		fOutput << "balance = ";
-		fOutput << (0.4*Handler.nTotalCaDust) + Handler.nTotalCaRain - (totalcaco3*0.4) - (Handler.nTotalCaLeachate*0.4) << endl << endl;
+		fOutput << (0.4*Handler.nTotalCaDust) + Handler.nTotalRain - (totalcaco3*0.4) - (Handler.nTotalCaLeachate*0.4) << endl << endl;
 		fOutput << "water mass balance (cm):\n";
 		fOutput <<  "intial soil water		rainfall		final soil water		AET			leachate\n";
-		fOutput << Handler.nInitMoistTotal << "\t\t\t\t" << Handler.nTotalCaRain << "\t\t\t\t" << Handler.nTotalMoist << "\t\t\t\t" << Handler.nTotalAet << "\t\t\t\t" << Handler.nTotalLeachate << endl;
-		fOutput << "balance = " << Handler.nInitMoistTotal + rainHandler.totalrain - Handler.nTotalMoist - Handler.nTotalAet - Handler.nTotalLeachate << endl;
+		fOutput << Handler.nInitMoistTotal << "\t\t\t\t" << Handler.nTotalRain << "\t\t\t\t" << Handler.nTotalMoist << "\t\t\t\t" << Handler.nTotalAet << "\t\t\t\t" << Handler.nTotalLeachate << endl;
+		fOutput << "balance = " <<  Handler.nTotalRain - Handler.nTotalMoist - Handler.nTotalAet - Handler.nTotalLeachate << endl;
 	}
 
 

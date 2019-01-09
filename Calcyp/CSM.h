@@ -30,7 +30,7 @@ public:
 	int nNumOfCompatments;
 	int nArea;
 	float nTotalCaDust;
-	float nTotalCaRain;
+	float nTotalRain;
 	float nTotalCaLeachate;
 	float nTotalSO4Leachate;
 	float nTotalLeachate;
@@ -40,7 +40,7 @@ public:
 	float nTotalWP;
 	float nTotalWhc;
 	void InitMonths();
-	
+	float BulkDensity;
 	
 
 	void InitCompartments();
@@ -51,7 +51,7 @@ public:
 	std::vector<Compartment> Compartments;
 	std::vector<Month> Months;
 	float* RainArr;
-	float* AET;
+	float AET;
 
 	
 	float nDust;

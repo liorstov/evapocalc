@@ -1,27 +1,30 @@
 #include "CSM.h"
 #include <ctime>
 
+#define MM_Ca = 40.08
+#define MM_SO4 = 96.06
+#define MM_CaSO4 = 136.14;
 
 
 
 //This code calculate the content and depth of pedogenic carbonate with depth
 CSM::CSM(float * rain)
 {
-	nNumOfDays = 1 * 100;
+	nNumOfDays = 1 * 365;
 	nDepth = 30;
 	thick = 5;
 	nNumOfCompatments = nDepth / thick;
 	wieltingPoint = 0.039;
-	CCa = 0.864 * pow(10, -5);
-	CSO4 = 0.144 * pow(10, -4);
-	
+	CCa = 0.864 * pow(10, -5); // mol
+	CSO4 = 1.04 * pow(10, -4); // mol
+	BulkDensity = 1.44; /// gr/cm^3
 	nArea = 1;
 	nFieldCapacity = 0.2;
 	nDust = 0.51 / (365.0*10000.0);
 	
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
-	nTotalCaRain = 0;
+	nTotalRain = 0;
 	nTotalCaLeachate = 0;
 	nTotalSO4Leachate = 0;
 	nTotalLeachate = 0;
@@ -34,7 +37,7 @@ CSM::CSM(float * rain)
 	nLeachate = 0;
 	RainArr = rain;
 
-	AET = new float[nNumOfDays];
+	AET = 0;
 
 }
 
@@ -56,125 +59,82 @@ void CSM::Calculate()
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= ((0.546*nTotalWhc) + nTotalWP)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
-			AET[day] = Months[(int)GetMonth(day)].PanDaily;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
-														//AET[day]=PETdaily[monthperday[day]];
-		else										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
-			AET[day] = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
-			//AET[day]=((moisttotal*0.352)-1.36)*pandaily[monthperday[day]];
-
-			nTotalAet += AET[day];
-
-			
-
-		if ((Compartments[0].nMoist - (Compartments[0].nThetaWeildingPnt * thick))<AET[day]) // examine if the daily AET is greater than the available water for evaporation at the 1st compartment
-		{
-			AET[day] = AET[day] - (Compartments[0].nMoist - (Compartments[0].nThetaWeildingPnt * thick));           // if yes, evaporate all the available moisture and set the moisture to the wilting point
-			Compartments[0].nMoist = Compartments[0].nThetaWeildingPnt * thick;
+			AET = Months[(int)GetMonth(day)].PanDaily;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
+														//AET=PETdaily[monthperday[day]];
+		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
+			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
-		else
-		{
-			Compartments[0].nMoist -= AET[day];             // if no, substract the AET from the moisture of the 1st compartment
-			AET[day] = 0.0;
-		}
-		// in both cases, the AET is updated: if the AET is greater than the available water for evaporation at the 1st compartment, than
-		// substract the part that was evaporated from the AET. Other wise, set AET to zero. 
 
-		//Compartments[0].nCaCO3 += (nDust / thick); // add the daily dust accumulation to the 1st compartment
+		nTotalMoist = 0;
+		nTotalAet += AET;
 		
-
-		if (((Compartments[0].nThetaWeildingPnt + Compartments[0].nWhc)*thick)<Compartments[0].nMoist) // examine if the updated moisture of the 1st compartment (after rainfall addition and AET substraction)
-													 // is greater than field capacity (=saturation). if yes, starts the solubility calculation
-		{
-			Compartments[0].solubility(nTemp); // calculates the carbonate solubility for the 1st compartment. ca equals to the amount of caco3 [g/cm3]
-			Compartments[1].nCCa += Compartments[0].nCCa;
-			Compartments[1].C_SO4 += Compartments[0].C_SO4;
-			Compartments[0].nCCa = 0;
-			Compartments[0].C_SO4 = 0;
-		}
-
+		nTotalRain += RainArr[day];
 		Compartments[0].nMoist +=RainArr[day];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
 
 		// This is the second loop that runs through the soil profile, from the 2nd compartment to the bottom
-		for (int d = 0;d < nNumOfCompatments-2;d++)
+		for (int d = 0; d < nNumOfCompatments; d++)
 		{
-			
 
-			if (Compartments[d - 1].nMoist>(Compartments[d - 1].nWhc + Compartments[d - 1].nThetaWeildingPnt)*thick)
-				nLeachate = Compartments[d - 1].nMoist - (Compartments[d - 1].nWhc + Compartments[d - 1].nThetaWeildingPnt)*thick; // determines the leachate from the upper compartment by substracting the field capacity from the moisture content
-			else nLeachate = 0.0; // if there is no excess water, then the leachate is zero
-			Compartments[d - 1].nMoist -= nLeachate; // subtract the leachate from the moisture of the upper compartment
-			Compartments[d].nMoist = Compartments[d].nMoist + nLeachate;    // add the leachate to the moisture of the current compartment
-
-			// same as for the 1st compartment, taking into account the AET for this current compartment, and updating the AET value
-			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick)<AET[day]) 
+			//  taking into account the AET for this current compartment, and updating the AET value
+			// moist - wieltingPOint is the water available for evaporation
+			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick) < AET)
 			{
-				AET[day] = AET[day] - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick));
+				AET = AET - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick));
 				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt * thick;
 			}
 			else
 			{
-				Compartments[d].nMoist -= AET[day];
-				AET[day] = 0.0;
+				Compartments[d].nMoist -= AET;
+				AET = 0.0;
 			}
 
-			if (((Compartments[d].nThetaWeildingPnt + Compartments[d].nWhc)*thick)<Compartments[d].nMoist) // same as for the 1st compartment, examine if we reached saturation
-			{
-				/*if (Compartments[d].nCaCO3>CCa)
-					nCaco3less = Compartments[d].nCaCO3 - CCa;
-				else nCaco3less = 0.0;
-				Compartments[d].nCaCO3 -= nCaco3less;
-				if (d != nDepth-1) Compartments[d + 1].nCaCO3 += nCaco3less;
-				else nTotalCaLeachate += nCaco3less;*/
+			if (Compartments[d].nMoist > (Compartments[d].nWhc*thick)) {
+				// determines the leachate by substracting the field capacity from the moisture content
+				nLeachate = Compartments[d].nMoist - (Compartments[d].nWhc)*thick;
+			}
+			// if there is no excess water, then the leachate is zero
+			else nLeachate = 0.0;
 
+			// subtract the leachate from the moisture of the  compartment
+			Compartments[d].nMoist -= nLeachate; 
 
-				Compartments[d].solubility(nTemp);
+			//calculating gypsum concentration and ion available for washing
+			Compartments[d].solubility(nTemp);
+
+			
+			//start washing down
+			
+			//  examin if we reached saturation
+			if (nLeachate > 0)
+			{	
 				//wash to next compartment or to leachete
-				if (d != nNumOfCompatments - 1) {
+				if (d != nNumOfCompatments - 2) {
 					Compartments[d + 1].nCCa += Compartments[d].nCCa;
 					Compartments[d + 1].C_SO4 += Compartments[d].C_SO4;
+					Compartments[d + 1].nMoist += nLeachate;
 				}
 				else
 				{
 					nTotalCaLeachate += Compartments[d].nCCa;
 					nTotalSO4Leachate += Compartments[d].C_SO4;
+					nTotalLeachate += nLeachate;
 				}
+
 				Compartments[d].nCCa = 0;
 				Compartments[d].C_SO4 = 0;
+				nLeachate = 0;
 			}
 
-			if (d == nNumOfCompatments -1) // examines if we reached the compartment above the lowest one 
-			{
-				if (AET[day]>0) nTotalAet -= AET[day];
-
-				//   if (moist[d+1]>((whc[d+1]+thetawp[d+1])*cthick)) 
-				//   {moist[d+1]=moist[d+1]-(moist[d+1]-(whc[d+1]+thetawp[d+1])*cthick); // calculate the moisture for the last compartment. if it is above field capacity, substracts the excess water from the moisture of the lowest compartment (i.e. the water is leached to the rock)
-				//    totalleachate=totalleachate+(moist[d+1]-(whc[d+1]+thetawp[d+1])*cthick);}
-				//   else
-				//{moist[d+1]=moist[d+1]-0.0;}
-
-				if (Compartments[d].nMoist>(Compartments[d].nWhc + Compartments[d].nThetaWeildingPnt)*thick)
-					nLeachate = Compartments[d].nMoist - (Compartments[d].nWhc + Compartments[d].nThetaWeildingPnt)*thick; // determines the leachate from the upper compartment by substracting the field capacity from the moisture content
-				else nLeachate = 0.0; // if there is no excess water, then the leachate is zero
-				Compartments[d - 1].nMoist -= nLeachate; // subtract the leachate from the moisture of the upper compartment
-				nTotalLeachate += nLeachate;
-
-
-				nTotalMoist = 0.0;
-				//pco2[d+1]=PCO2(d+1,julian,cthick);
-				for (int w = 1;w < nNumOfCompatments;w++) // resert the initial soil moisture as the current soil moisture, and calculate the total moisture
-				{
-					nTotalMoist += Compartments[w].nMoist;
-					//fprintf(fp5,"%d\t%0.3f\n",w,moist[w]);
-				}
-
-
-			}
+			
 			printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day,RainArr[day],d, Compartments[d].nMoist, Compartments[d].C_CaSO4);
 
-
+			nTotalMoist += Compartments[d].nMoist;
 		}
 
 	}
+
+	// aggreagating total moist
+	
 }
 
 std::vector<Compartment>* CSM::GetCompartments()
@@ -189,7 +149,6 @@ CSM::~CSM()
 	Compartments.~vector();
 	Months.~vector();
 	printf ("Characters: %c %c \n", 'a', 65);
-	delete[] AET;
 }
 
 void CSM::InitCompartments()
@@ -259,40 +218,40 @@ MONTH CSM::GetMonth(int nDay)
 	MONTH month;
 	nDay = JULIAN(nDay);
 	if (nDay <= 31)
-		month = Jan;
+		month = Oct;
 	else
 		if (nDay <= 59)
-			month = Feb;
+			month = Nov;
 		else
 			if (nDay <= 90)
-				month = Mar;
+				month =Dec;
 			else
 				if (nDay <= 120)
-					month = Apr;
+					month = Jan;
 				else
 					if (nDay <= 151)
-						month = May;
+						month = Feb;
 					else
 						if (nDay <= 181)
-							month = Jun;
+							month = Apr;
 						else
 							if (nDay <= 212)
-								month = Jul;
+								month = May;
 							else
 								if (nDay <= 243)
-									month = Aug;
+									month = Jun;
 								else
 									if (nDay <= 273)
-										month = Sep;
+										month = Jul;
 									else
 										if (nDay <= 304)
-											month = Oct;
+											month = Aug;
 										else
 											if (nDay <= 334)
-												month = Nov;
+												month = Sep;
 											else
 												if (nDay <= 365)
-													month = Dec;
+													month = Oct;
 	return month;
 
 }

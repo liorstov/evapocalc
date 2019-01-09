@@ -7,7 +7,7 @@ Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldca
 	this->nThetaWeildingPnt = wieldingpoint;
 	this->nFieldCapacity = fieldcapacity;
 	this->nWhc = fieldcapacity;
-	this->nMoist = 0.1*thick;
+	this->nMoist = 0*thick;
 	this->nCaCO3 = 0;
 	this->nCCa = CCa0;
 	this->C_SO4 = CSO4;
@@ -76,9 +76,14 @@ float Compartment::solubility(float temp)
 {
 
 	{
-		float I, A, k6, ionActivity, EquilConcentrationConstant,
+		float I, A, k6, ionActivity, EquilConcentrationConstant, MCa,MSo4,MCaSO4,
 			CurrentConcentrationProduct, GypOmega, alphaGypsum, totalConcentrationProduct, a, b, c;
 
+		//convert to Molar
+		float MoistInLitre = this->nMoist * 0.01;
+		MCa = nCCa / MoistInLitre;
+		MSo4 = C_SO4 / MoistInLitre;
+		MCaSO4 = C_CaSO4 / MoistInLitre;
 		 k6 = pow(10, -2.23 - (0.0019*temp));
 
 											 // Ionic strength
@@ -88,39 +93,41 @@ float Compartment::solubility(float temp)
 		
 		// check if percipitating
 		EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
-		CurrentConcentrationProduct = nCCa * C_SO4;
+		CurrentConcentrationProduct = MCa * MSo4;
 
 		// omega is the difference between current product and equil product
 		GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
-		totalConcentrationProduct = nCCa * C_SO4;
+		totalConcentrationProduct = MCa * MSo4;
 
 		// the concentration we need to add or substract to gypsum
-		alphaGypsum = 0;
-		
+		alphaGypsum = 0;	
 
 		// check if  percipitation occurs
 		if (GypOmega >= 0 ) 
 		{
 			// solving polinum
 			a = 1;
-			b = -(nCCa + C_SO4);
+			b = -(MCa + MSo4);
 			c = (CurrentConcentrationProduct - GypOmega);
 			alphaGypsum = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
-			nCCa -= alphaGypsum;
-			C_SO4 -= alphaGypsum;
-			C_CaSO4 += alphaGypsum;			
+			MCa -= alphaGypsum;
+			MSo4 -= alphaGypsum;
+			MCaSO4 += alphaGypsum;			
 		}
 		// gypsum dissolution
 		else {
 			a = 1;
-			b = (nCCa + C_SO4);
+			b = (MCa + MSo4);
 			c = (CurrentConcentrationProduct + GypOmega);
 			alphaGypsum = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
-			nCCa += alphaGypsum;
-			C_SO4 += alphaGypsum;
-			C_CaSO4 -= alphaGypsum;
+			MCa += alphaGypsum;
+			MSo4 += alphaGypsum;
+			MCaSO4 -= alphaGypsum;
 		}
 
+		nCCa = MCa * MoistInLitre;
+		C_SO4 = MSo4 * MoistInLitre;
+		C_CaSO4 = MCaSO4 * MoistInLitre;
 		setAllToZero();
 		
 		return C_CaSO4;
