@@ -6,9 +6,9 @@ public:
 	
 	~Compartment();
 	
-	float PCO2(int nDay);
 	float solubility(float temp);
 	void setAllToZero();
+	float GetIOnsSum();
 
 	int nIndex;
 	int nthick;

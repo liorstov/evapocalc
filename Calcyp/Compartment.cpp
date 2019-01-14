@@ -32,40 +32,6 @@ Compartment::~Compartment()
 // PCO2 is a function that calculates the partial pressure of CO2 in the soil atmosphere - pco2 [ppm] based on the soil depth [cm].
 // We used equations derived from data presented in Table A1 of Marion et al. (2008).
 
-float Compartment::PCO2(int nDayjulian)
-{
-	float zt, zb, pco2, pco2t, pco2b;
-
-	zt = (nIndex - 1)*nthick;
-	zb = nIndex*nthick;
-
-	if ((nDayjulian>68) & (nDayjulian<140)) // spring
-	{
-		pco2t = (-0.037 / 3 * pow(zt, 3)) + (15.36 / 2 * pow(zt, 2)) + (653.36*zt);
-		pco2b = (-0.037 / 3 * pow(zb, 3)) + (15.36 / 2 * pow(zb, 2)) + (653.36*zb);
-	}
-	else
-		if ((nDayjulian>139) & (nDayjulian<228)) // summer
-		{
-			pco2t = (-0.053 / 3 * pow(zt, 3)) + (16.39 / 2 * pow(zt, 2)) + (698.60*zt);
-			pco2b = (-0.053 / 3 * pow(zb, 3)) + (16.39 / 2 * pow(zb, 2)) + (698.60*zb);
-		}
-		else
-			if ((nDayjulian>227) & (nDayjulian<329)) // fall
-			{
-				pco2t = (0.023 / 3 * pow(zt, 3)) + (1.40 / 2 * pow(zt, 2)) + (664.45*zt);
-				pco2b = (0.023 / 3 * pow(zb, 3)) + (1.40 / 2 * pow(zb, 2)) + (664.45*zb);
-			}
-			else // winter
-			{
-				pco2t = (-0.042 / 3 * pow(zt, 3)) + (9.33 / 2 * pow(zt, 2)) + (775.62*zt);
-				pco2b = (-0.042 / 3 * pow(zb, 3)) + (9.33 / 2 * pow(zb, 2)) + (775.62*zb);
-			}
-
-	pco2 = (pco2b - pco2t) / nthick / pow(10, 6); // divide by 10^6 to transfer from [ppm] to [atm]
-
-	return pco2;
-}
 
 
 // solubility is a function that calculates the mass - caco3 [g] of CaCO3 and concentration of Ca in solution - cca [mol/L] or [M] in a compartment given the temprature - temp [deg]
@@ -105,11 +71,11 @@ float Compartment::solubility(float temp)
 		// check if  percipitation occurs
 		if (GypOmega >= 0 ) 
 		{
-			// solving polinum
+			// percipitation
 			a = 1;
 			b = -(MCa + MSo4);
 			c = (CurrentConcentrationProduct - GypOmega);
-			alphaGypsum = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+			alphaGypsum = fabs((-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a));
 			MCa -= alphaGypsum;
 			MSo4 -= alphaGypsum;
 			MCaSO4 += alphaGypsum;			
@@ -119,7 +85,7 @@ float Compartment::solubility(float temp)
 			a = 1;
 			b = (MCa + MSo4);
 			c = (CurrentConcentrationProduct + GypOmega);
-			alphaGypsum = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+			alphaGypsum = fabs((-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a));
 			MCa += alphaGypsum;
 			MSo4 += alphaGypsum;
 			MCaSO4 -= alphaGypsum;
@@ -136,6 +102,7 @@ float Compartment::solubility(float temp)
 	
 }
 
+
 void Compartment::setAllToZero()
 {
 	{
@@ -143,4 +110,9 @@ void Compartment::setAllToZero()
 		if (C_SO4 < 0) C_SO4 = 0;
 		if (C_CaSO4 < 0) C_CaSO4 = 0;
 	}
+}
+
+float Compartment::GetIOnsSum()
+{
+	return C_CaSO4 + C_SO4 + nCCa;
 }
