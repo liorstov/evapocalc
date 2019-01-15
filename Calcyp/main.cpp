@@ -1,4 +1,3 @@
-#pragma once
 #include "CSM.h"
 #include "Rain.h"
 #include "UI.h"
@@ -10,15 +9,15 @@ int main()
 	Rain Rainclass(false);
 	
 
-
-	CSM Calc(Rainclass.rain);
-	Calc.Calculate();
-
-	UI ui(Calc, Rainclass);
+	
+	CSM * Calc = new CSM();
+	
+	Calc->Calculate(Rainclass.rain, 1, 50, 5, 0.039, 10, 10, 1.44, 1, 0.2, 0, 0);
+	UI ui(*Calc, Rainclass);
 	ui.Print();
 
-	system("pause");
+	//system("pause");
 	
 
-
 }
+

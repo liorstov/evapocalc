@@ -7,20 +7,11 @@
 
 
 
+
 //This code calculate the content and depth of pedogenic carbonate with depth
-CSM::CSM(float * rain)
+CSM::CSM()
 {
-	nNumOfDays = 1 * 365;
-	nDepth = 30;
-	thick = 5;
-	nNumOfCompatments = nDepth / thick;
-	wieltingPoint = 0.039;
-	CCa = 0.864 * pow(10, -5); // mol
-	CSO4 = 1.04 * pow(10, -4); // mol
-	BulkDensity = 1.44; /// gr/cm^3
-	nArea = 1;
-	nFieldCapacity = 0.2;
-	nDust = 0.51 / (365.0*10000.0);
+	
 	
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
@@ -35,24 +26,42 @@ CSM::CSM(float * rain)
 	
 	
 	nLeachate = 0;
-	RainArr = rain;
 
 	AET = 0;
 
 }
 
-void CSM::Calculate()
+
+void CSM::Calculate(float * rain, int years, int Depth, int nthick, float nwieltingPoint, float InitialCa, float initialSO4,
+float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4)
 {
+	nNumOfDays = years * 365;
+	nDepth = Depth;
+	thick = nthick;
+	nNumOfCompatments = nDepth / thick;
+	wieltingPoint = nwieltingPoint;
+	CCa =meq2mmol(InitialCa, nthick*nArea); // mmol
+	CSO4 = meq2mmol(initialSO4, nthick*nArea); // mmol
+	BulkDensity =nBulkDensity; /// gr/cm^3
+	nArea = FieldArea;
+	nFieldCapacity = FieldCapacity;
+	nDustCa = nDustCa;
+	nDustSO4 = DustSO4;
+
 	InitCompartments();
  
   
 	InitMonths();
-	printf ("Characters: %c %c \n", 'a', 65);
+
+	RainArr = rain;
+
+	printf ("wilting point: %f \n", wieltingPoint);
 	int nMonth;
 	float nTemp;
 	//main loop over days
 	for (int day = 0; day < nNumOfDays; day++)
 	{
+
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
 		 
@@ -103,7 +112,8 @@ void CSM::Calculate()
 
 			
 			//start washing down
-			
+			//Rcout << "moist" << Compartments[d].nMoist << endl;
+			//Rcout << "leachet "<< nLeachate << endl;
 			//  examin if we reached saturation
 			if (nLeachate > 0)
 			{	
@@ -126,15 +136,28 @@ void CSM::Calculate()
 			}
 
 			
-			printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day,RainArr[day],d, Compartments[d].nMoist, Compartments[d].C_CaSO4);
+			//printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day,RainArr[day],d, Compartments[d].nMoist, Compartments[d].C_CaSO4);
 
 			nTotalMoist += Compartments[d].nMoist;
 		}
+		if (day % 365){
+			//printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day, RainArr[day], 0, Compartments[0].nMoist, Compartments[0].GetIOnsSum());
+		}
+
+		//printf_s("second comp gypsum: %f  \n", Compartments[2].C_CaSO4);
 
 	}
+	//Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
+	//vect.erase(0, vect.length());
+	//for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
+	//	//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
+	//	vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
+	//	//Rcout << "comp gypsum:" << mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)) << endl;
+	//}	
+	//
+	//Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect);
 
-	// aggreagating total moist
-	
+	//return returnList;
 }
 
 std::vector<Compartment>* CSM::GetCompartments()
@@ -142,13 +165,28 @@ std::vector<Compartment>* CSM::GetCompartments()
 	return &Compartments;
 }
 
+
+
+//input meq/100g return mmol/cm3
+float CSM::meq2mmol(float fMeq, float SoilVolume)
+{
+	//fmeq is meq/100g soil . multiply by bukl denisty[g/cm3] mult by 0.5[mmol/meq]
+	return(fMeq * 1.44 * 0.01 *0.5 * SoilVolume);
+}
+
+//input mmol/cm3 return meq/100g soil
+float CSM::mmol2meq(float mmol, float SoilVolume)
+{
+	return (mmol * 2*(1/1.44)*100 * SoilVolume);
+}
+
  
 
 CSM::~CSM()
 {
-	Compartments.~vector();
-	Months.~vector();
-	printf ("Characters: %c %c \n", 'a', 65);
+	//Compartments.~vector();
+	//Months.~vector();
+	printf ("csm destructor");
 }
 
 void CSM::InitCompartments()
@@ -169,7 +207,6 @@ void CSM::InitMonths()
 {
   //NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
   float II = 0.0;
-	float ca = 0.0;
 	float a = 0;
 	float PET = 0;
 	float PETdaily = 0;
@@ -265,10 +302,17 @@ float CSM::JULIAN(int day)
 	return julian;
 }
 
-
-//RCPP_MODULE(unif_module) {
-//  class_<CSM>( "CSM" )
-//  .constructor<int>()
-//  .field( "min", &CSM::nNumOfDays )
-//  ;
+//// [[Rcpp::plugins(cpp11)]]
+//RCPP_MODULE(CSM_MODULE) {
+//	class_<CSM>("CSMCLASS")
+//		.constructor()
+//
+//		.method("Calculate", &CSM::Calculate,
+//			"Docstring for stats")
+//		.method("test", &CSM::test,
+//			"tst")
+//
+//		.method("InitMonths", &CSM::InitMonths, "desc")
+//		.field("RainArr", &CSM::RainArr, "rain array")
+//		;
 //}

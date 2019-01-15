@@ -11,7 +11,6 @@
 
 using namespace std;
 
-// [[Rcpp::plugins(cpp11)]]
 
 typedef enum { WINTER, SPRING, SUMMER } SEASON;
 
@@ -19,9 +18,13 @@ typedef enum { WINTER, SPRING, SUMMER } SEASON;
 class CSM
 {
 public:
-	CSM(float* rain);
-	void Calculate();
+	CSM();
+	void Calculate(float * rain, int years, int Depth, int nthick, float nwieltingPoint, float InitialCa, float initialSO4,
+		float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4);
 	std::vector<Compartment>* GetCompartments();
+	void test(int l, float b = 5);
+	float meq2mmol(float, float);
+	float mmol2meq(float, float);
 	~CSM();
 
 	int nNumOfDays;
@@ -50,11 +53,12 @@ public:
 
 	std::vector<Compartment> Compartments;
 	std::vector<Month> Months;
-	float* RainArr;
+	float *  RainArr;
 	float AET;
 
 	
-	float nDust;
+	float nDustCa;
+	float nDustSO4;
 	float wieltingPoint;
 	float nFieldCapacity;
 	float CCa;
@@ -68,13 +72,6 @@ public:
 	float TempArr[12] = { 10.2,11.8,14.3,18.1,22.6,27.8,30.0,28.9,26.7,20.8,14.6,10.8 };
 };
 
-//RCPP_MODULE(CSM_MODULE) {
-//  class_<CSM>( "CSM" )
-//  .constructor<float>()
-//  
-//  .method( "Calculate", &CSM::Calculate,
-//  "Docstring for stats")
-//  .method("InitMonths", &CSM::InitMonths, "desc")
-//
-//  ;}
+//RCPP_EXPOSED_CLASS(CSM);
+
 
