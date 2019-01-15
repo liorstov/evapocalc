@@ -23,6 +23,8 @@ public:
 		float , float , float , float , float );
 	std::vector<Compartment>* GetCompartments();
 	void test(int l, float b = 5);
+	float meq2mmol(float, float);
+	float mmol2meq(float, float);
 	~CSM();
 
 	int nNumOfDays;
