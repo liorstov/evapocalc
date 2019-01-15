@@ -40,8 +40,8 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 	thick = nthick;
 	nNumOfCompatments = nDepth / thick;
 	wieltingPoint = nwieltingPoint;
-	CCa =InitialCa; // mol
-	CSO4 = initialSO4; // mol
+	CCa =meq2mmol(InitialCa, nthick*nArea); // mmol
+	CSO4 = meq2mmol(initialSO4, nthick*nArea); // mmol
 	BulkDensity =nBulkDensity; /// gr/cm^3
 	nArea = FieldArea;
 	nFieldCapacity = FieldCapacity;
@@ -112,7 +112,8 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 
 			
 			//start washing down
-			
+			//Rcout << "moist" << Compartments[d].nMoist << endl;
+			//Rcout << "leachet "<< nLeachate << endl;
 			//  examin if we reached saturation
 			if (nLeachate > 0)
 			{	
@@ -143,12 +144,15 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 			//printf("%ld\t%0.3f\t%ld\t%0.3f\t%0.3f\n", day, RainArr[day], 0, Compartments[0].nMoist, Compartments[0].GetIOnsSum());
 		}
 
+		//printf_s("second comp gypsum: %f  \n", Compartments[2].C_CaSO4);
+
 	}
 	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
 	vect.erase(0, vect.length());
 	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
-		vect.push_back(it->C_CaSO4*it->nMoist*1000*2*69);
+		vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
+		//Rcout << "comp gypsum:" << mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)) << endl;
 	}	
 	
 	Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect);
@@ -166,13 +170,26 @@ void CSM::test(int l, float b)
 	Rcpp::Rcout <<  "asdasd";
 }
 
+//input meq/100g return mmol/cm3
+float CSM::meq2mmol(float fMeq, float SoilVolume)
+{
+	//fmeq is meq/100g soil . multiply by bukl denisty[g/cm3] mult by 0.5[mmol/meq]
+	return(fMeq * 1.44 * 0.01 *0.5 * SoilVolume);
+}
+
+//input mmol/cm3 return meq/100g soil
+float CSM::mmol2meq(float mmol, float SoilVolume)
+{
+	return (mmol * 2*(1/1.44)*100 * SoilVolume);
+}
+
  
 
 CSM::~CSM()
 {
-	Compartments.~vector();
-	Months.~vector();
-	printf ("Characters: %c %c \n", 'a', 65);
+	//Compartments.~vector();
+	//Months.~vector();
+	printf ("csm destructor");
 }
 
 void CSM::InitCompartments()

@@ -1,5 +1,7 @@
 #include "Compartment.h"
+#include <Rcpp.h>
 #include "math.h"
+#include <stdio.h>
 
 Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CSO4)
 {
@@ -40,66 +42,90 @@ Compartment::~Compartment()
 // The calculation is following Marion et al. (1985) and Hirmas et al. (2010)
 float Compartment::solubility(float temp)
 {
+	float I, A, k6, ionActivity, EquilConcentrationConstant, MCa, MSo4, MCaSO4,
+		CurrentConcentrationProduct, GypOmega, alphaGypsum, totalConcentrationProduct, a, b, c;
+	float * Quadsolutions;
 
+	//convert to Molar
+	float MoistInLitre = this->nMoist * 0.01;
+	MCa = nCCa / MoistInLitre;
+	MSo4 = C_SO4 / MoistInLitre;
+	MCaSO4 = C_CaSO4 / MoistInLitre;
+	k6 = pow(10, -2.23 - (0.0019*temp));
+
+	// Ionic strength
+	I = 0.5*(MCa * 4 + MSo4 * 4); // eq. 14. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
+	A = 0.4918 + (6.6098 * pow(10, -4) * temp) + (5.0231 * pow(10, -6) * pow(temp, 2));
+	ionActivity = pow(10, -A * 4 * (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
+
+	// check if percipitating
+	EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
+	CurrentConcentrationProduct = MCa * MSo4;
+
+	// omega is the difference between current product and equil product
+	GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
+	totalConcentrationProduct = MCa * MSo4;
+
+	// the concentration we need to add or substract to gypsum
+	alphaGypsum = 0;
+
+	// check if  percipitation occurs
+	if (GypOmega >= 0)
 	{
-		float I, A, k6, ionActivity, EquilConcentrationConstant, MCa,MSo4,MCaSO4,
-			CurrentConcentrationProduct, GypOmega, alphaGypsum, totalConcentrationProduct, a, b, c;
+		// percipitation
+		a = 1;
+		b = -(MCa + MSo4);
+		c = (CurrentConcentrationProduct - GypOmega);
+		Quadsolutions = quadricEquation(a, b, c);
 
-		//convert to Molar
-		float MoistInLitre = this->nMoist * 0.01;
-		MCa = nCCa / MoistInLitre;
-		MSo4 = C_SO4 / MoistInLitre;
-		MCaSO4 = C_CaSO4 / MoistInLitre;
-		 k6 = pow(10, -2.23 - (0.0019*temp));
+		Rcpp::Rcout << "ca  " << MCa << " so4 " << MSo4 << " omega " << EquilConcentrationConstant << " solution " <<
+			Quadsolutions[0] << " " << Quadsolutions[1] << std::endl;
 
-											 // Ionic strength
-		I = 0.5*(nCCa*4+C_SO4*4); // eq. 14. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
-		A = 0.4918 + (6.6098 * pow(10, -4) * temp) + (5.0231 * pow(10, -6) * pow(temp, 2));
-		ionActivity = pow(10, -A * 4 * (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
-		
-		// check if percipitating
-		EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
-		CurrentConcentrationProduct = MCa * MSo4;
 
-		// omega is the difference between current product and equil product
-		GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
-		totalConcentrationProduct = MCa * MSo4;
-
-		// the concentration we need to add or substract to gypsum
-		alphaGypsum = 0;	
-
-		// check if  percipitation occurs
-		if (GypOmega >= 0 ) 
-		{
-			// percipitation
-			a = 1;
-			b = -(MCa + MSo4);
-			c = (CurrentConcentrationProduct - GypOmega);
-			alphaGypsum = fabs((-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a));
-			MCa -= alphaGypsum;
-			MSo4 -= alphaGypsum;
-			MCaSO4 += alphaGypsum;			
-		}
-		// gypsum dissolution
-		else {
-			a = 1;
-			b = (MCa + MSo4);
-			c = (CurrentConcentrationProduct + GypOmega);
-			alphaGypsum = fabs((-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a));
-			MCa += alphaGypsum;
-			MSo4 += alphaGypsum;
-			MCaSO4 -= alphaGypsum;
-		}
-
-		nCCa = MCa * MoistInLitre;
-		C_SO4 = MSo4 * MoistInLitre;
-		C_CaSO4 = MCaSO4 * MoistInLitre;
-		setAllToZero();
-		
-		return C_CaSO4;
-		
+		alphaGypsum = fmaxf(Quadsolutions[0], Quadsolutions[1]);
+		//Rcpp::Rcout << "percip:  " << Quadsolutions[0] << "  " << Quadsolutions[1] << "  " << std::endl;
+		MCa -= alphaGypsum;
+		MSo4 -= alphaGypsum;
+		MCaSO4 += alphaGypsum;
 	}
+	// gypsum dissolution
+	else {
+		a = 1;
+		b = (MCa + MSo4);
+		c = (CurrentConcentrationProduct + GypOmega);
+		Quadsolutions = quadricEquation(a, b, c);
+
+		Rcpp::Rcout << "ca  " << MCa << " so4 " << MSo4 << " omega " << EquilConcentrationConstant << " solution " <<
+			Quadsolutions[0] << " " << Quadsolutions[1] << std::endl;
+
+
+		alphaGypsum = fabsf(fminf(Quadsolutions[0], Quadsolutions[1]));
+		//Rcpp::Rcout << "diss:  " << Quadsolutions[0]<< "  " << Quadsolutions[1]<< "  " << std::endl;
+
+		MCa += alphaGypsum;
+		MSo4 += alphaGypsum;
+		MCaSO4 -= alphaGypsum;
+	}
+
+	nCCa = MCa * MoistInLitre;
+	C_SO4 = MSo4 * MoistInLitre;
+	C_CaSO4 = MCaSO4 * MoistInLitre;
+	setAllToZero();
+
+	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
+
+	return C_CaSO4;
+		
 	
+	
+}
+
+float * Compartment::quadricEquation(float a, float b , float c)
+{
+	float solutions[2];
+	solutions[0] = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	solutions[1] = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	return solutions;
 }
 
 

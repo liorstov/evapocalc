@@ -7,6 +7,7 @@ public:
 	~Compartment();
 	
 	float solubility(float temp);
+	float* quadricEquation(float, float, float);
 	void setAllToZero();
 	float GetIOnsSum();
 

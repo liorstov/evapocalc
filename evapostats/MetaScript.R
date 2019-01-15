@@ -19,13 +19,15 @@ GetRandomValue <- function(X) {
 rmsd <- function(MatrixOC) {
     sqrt(sum((MatrixOC[, 1] - MatrixOC[, 2]) ^ 2))
 }
-CalcGypsum <- function(raindata, years=100, Depth = 50, thick = 5, wieltingPoint = 0.039, InitialCa = 0.864 * 10 ^ -5, initialSO4 = 1.04 * 10 ^ -4
-                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.2, DustCa = 0, DustSO4 = 0, observedArray) {
+
+CalcGypsum <- function(raindata = EilatData[, 1], years = 100, Depth = 50, thick = 5, wieltingPoint = 0.039, InitialCa = 10, initialSO4 = 10
+                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.2, DustCa = 0, DustSO4 = 0, observedArray = observedCom) {
     b = new(CSMCLASS);
     list = b$Calculate(raindata, years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
                    DustCa, DustSO4);
-    cat(wieltingPoint, "      ", list$gypsum, '\n')
+    #cat(wieltingPoint, "      ", list$gypsum, '\n')
     observedArray[, 2] = list$gypsum;
+    rm(list);
     return(list(RMSD = rmsd(observedArray), Result = observedArray));
 }
 
@@ -40,20 +42,7 @@ Observed = read.csv("DB/measured.CSV");
 
 
 
-#init variables
-NumberOfYears = 100;
-rain = EilatData[, 1]
-years = 100
-Depth = 50
-thick = 5
-wieltingPoint = 0.039
-InitialCa = 0.864 * 10^-5
-initialSO4 = 1.04 * 10^-4
-BulkDensity = 1.44
-nArea = 1
-FieldCapacity = 0.2
-DustCa = 0
-DustSO4 = 0
+
 
 
 #create observed comartments
@@ -63,16 +52,16 @@ observedCom[2:8,1] = 2.44;
 observedCom[8:10,1] = 4.2;
 
 Rcpp::sourceCpp('C:/Users/Lior/master/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
-
+temp = CalcGypsum(years = 100);
 wiltingPointArray = seq(0.001, 0.04, 0.001);
 
-temp = sapply(wiltingPointArray, FUN = function(X) CalcGypsum(raindata = EilatData[, 1], observedArray = observedCom, wieltingPoint = X));
+
+temp = lapply(wiltingPointArray, FUN = function(X) CalcGypsum( wieltingPoint = X));
 
 #find minimum value
 minimal = temp[2, temp[1,] == min(unlist(temp[1,]))]
 
 plot(x= wiltingPointArray, y = temp);
-l = CalcGypsum(raindata = );
 df = as.data.frame.array(minimal$Result);
 df$depth = (1:nrow(df) * thick);
 ggplot(df) + geom_path(, mapping = aes(y = depth, x = Observed, colour = "Observed")) +
