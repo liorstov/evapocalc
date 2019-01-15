@@ -21,6 +21,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCpp1|AnyCPU'" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCppo|AnyCPU'" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='NoRCpp|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCPP|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RCPP|AnyCPU'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Rcpp|AnyCPU'" />
   <ProjectExtensions>
     <VisualStudio>
       <UserProperties />

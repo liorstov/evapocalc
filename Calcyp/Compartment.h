@@ -6,9 +6,10 @@ public:
 	
 	~Compartment();
 	
-	float PCO2(int nDay);
 	float solubility(float temp);
+	float* quadricEquation(float, float, float);
 	void setAllToZero();
+	float GetIOnsSum();
 
 	int nIndex;
 	int nthick;
