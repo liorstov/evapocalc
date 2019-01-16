@@ -34,6 +34,8 @@ void UI::Print()
 		fOutput <<  "intial soil water		rainfall		final soil water		AET			leachate\n";
 		fOutput << Handler.nInitMoistTotal << "\t\t\t\t" << Handler.nTotalRain << "\t\t\t\t" << Handler.nTotalMoist << "\t\t\t\t" << Handler.nTotalAet << "\t\t\t\t" << Handler.nTotalLeachate << endl;
 		fOutput << "balance = " <<  Handler.nTotalRain - Handler.nTotalMoist - Handler.nTotalAet - Handler.nTotalLeachate << endl;
+		fOutput << "leachete in cm:" << Handler.nTotalLeachate << "   ca leachate " << Handler.nTotalCaLeachate << "   so4 lechate " << Handler.nTotalSO4Leachate << endl;
+		fOutput << "AET in cm " << Handler.nTotalAet << endl;
 	}
 
 

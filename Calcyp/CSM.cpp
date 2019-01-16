@@ -21,7 +21,7 @@ CSM::CSM()
 	nTotalAet = 0;
 	nTotalWP = 0;
 	nTemp = 0;
-	
+	accumolateDustDays = 0.0F;
 	
 	nLeachate = 0;
 
@@ -43,18 +43,20 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 	CSO4 = meq2mmol(initialSO4, nthick*nArea); // mmol
 	BulkDensity =nBulkDensity; /// gr/cm^3
 	nFieldCapacity = FieldCapacity * nthick;
-	nDustCa = DustCa;
-	nDustSO4 = DustSO4;
+
+	// carbonate in dust range from 0.5 to 5 [g m-2 yr-1]. 
+	//I took 0.51 [g m-2 yr-1] = 5.1*10^-5 [g cm-2 yr-1] = 1.4*10^-7 [g cm-2 day-1]
+	// then convert to [mmol cm-2 day-1] 
+	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 25.0F;
+	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 10.0F;
+
+	nTotalWhc = nFieldCapacity * nNumOfCompatments;
 	nTotalMoist = wieltingPoint * nNumOfCompatments;
 	nTotalWP = nTotalMoist;
 	InitCompartments();
- 
-  
 	InitMonths();
-
 	RainArr = rain;
 
-	printf ("wilting point: %f \n", wieltingPoint);
 	int nMonth;
 	float nTemp;
 	//main loop over days
@@ -72,13 +74,26 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
-		nTotalMoist = 0;
-		nTotalAet += GetPrecision(AET);
-		
-		nTotalRain += RainArr[day];
-		Compartments[0].nMoist +=RainArr[day];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
 
-		// This is the second loop that runs through the soil profile, from the 2nd compartment to the bottom
+		//AET = AET * 10;
+		nTotalMoist = 0;
+		nTotalAet += AET;
+		
+		nTotalRain += RainArr[day%(365000)];
+		Compartments[0].nMoist +=RainArr[day % (365000)];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
+
+		//accumolate dust and relaese when its raining 
+		if (RainArr[day % (365000)] > 0) {
+			Compartments[0].nCCa += accumolateDustDays * nDailyDustCa;
+			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4;
+			accumolateDustDays = 0;
+		}
+		else
+		{
+			accumolateDustDays++;
+		}
+
+		// This is the second loop that runs through the soil profile
 		for (int d = 0; d < nNumOfCompatments; d++)
 		{
 
@@ -106,7 +121,12 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 			Compartments[d].nMoist -= nLeachate; 
 
 			//calculating gypsum concentration and ion available for washing
-			Compartments[d].solubility(nTemp);
+			// only if moist change since yesterday
+			if (Compartments[d].nMoist != Compartments[d].nLastMoist) {
+				Compartments[d].solubility(nTemp);
+				Compartments[d].nLastMoist = Compartments[d].nMoist;
+			}
+
 
 			
 			//start washing down
@@ -116,7 +136,7 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 			if (nLeachate > 0)
 			{	
 				//wash to next compartment or to leachete
-				if (d != nNumOfCompatments - 2) {
+				if (d != nNumOfCompatments - 1) {
 					Compartments[d + 1].nCCa += Compartments[d].nCCa;
 					Compartments[d + 1].C_SO4 += Compartments[d].C_SO4;
 					Compartments[d + 1].nMoist += nLeachate;
@@ -199,10 +219,6 @@ void CSM::InitCompartments()
 	{
 		newCompartment = new Compartment(i, nArea, wieltingPoint, nFieldCapacity, thick, CCa, CSO4);
 		Compartments.push_back(*newCompartment);
-		nTotalWP += wieltingPoint;
-		nTotalWhc += nFieldCapacity * thick;
-		nTotalMoist += newCompartment->nMoist;
-		nInitMoistTotal = nTotalMoist;
 	}
 }
 
