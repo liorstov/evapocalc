@@ -44,6 +44,7 @@ public:
 	float nTotalWhc;
 	void InitMonths();
 	float BulkDensity;
+	float accumolateDustDays;
 	
 
 	void InitCompartments();
@@ -57,8 +58,8 @@ public:
 	float AET;
 
 	
-	float nDustCa;
-	float nDustSO4;
+	float nDailyDustCa;
+	float nDailyDustSO4;
 	float wieltingPoint;
 	float nFieldCapacity;
 	float CCa;

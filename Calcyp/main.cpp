@@ -12,7 +12,7 @@ int main()
 	
 	CSM * Calc = new CSM();
 	
-	Calc->Calculate(Rainclass.rain, 4, 50, 5, float(0.039), 10, 10, float(1.44), 1, float(0.2), 0, 0);
+	Calc->Calculate(Rainclass.rain, 1000, 100, 5, float(0.039), 33, 33, float(1.44), 1, float(0.2), 1000, 1000);
 	UI ui(*Calc, Rainclass);
 	ui.Print();
 
