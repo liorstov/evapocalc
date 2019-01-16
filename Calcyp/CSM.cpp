@@ -11,8 +11,6 @@
 //This code calculate the content and depth of pedogenic carbonate with depth
 CSM::CSM()
 {
-	
-	
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
 	nTotalRain = 0;
@@ -32,22 +30,23 @@ CSM::CSM()
 }
 
 
-void CSM::Calculate(float * rain, int years, int Depth, int nthick, float nwieltingPoint, float InitialCa, float initialSO4,
+void CSM::Calculate(float * rain, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa, float initialSO4,
 float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4)
 {
 	nNumOfDays = years * 365;
 	nDepth = Depth;
-	thick = nthick;
+	thick = nthick;	
+	nArea = FieldArea;
 	nNumOfCompatments = nDepth / thick;
-	wieltingPoint = nwieltingPoint;
+	wieltingPoint = nwieltingPoint * thick;
 	CCa =meq2mmol(InitialCa, nthick*nArea); // mmol
 	CSO4 = meq2mmol(initialSO4, nthick*nArea); // mmol
 	BulkDensity =nBulkDensity; /// gr/cm^3
-	nArea = FieldArea;
-	nFieldCapacity = FieldCapacity;
-	nDustCa = nDustCa;
+	nFieldCapacity = FieldCapacity * nthick;
+	nDustCa = DustCa;
 	nDustSO4 = DustSO4;
-
+	nTotalMoist = wieltingPoint * nNumOfCompatments;
+	nTotalWP = nTotalMoist;
 	InitCompartments();
  
   
@@ -61,7 +60,7 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 	//main loop over days
 	for (int day = 0; day < nNumOfDays; day++)
 	{
-
+		
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
 		 
@@ -73,9 +72,8 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
-
 		nTotalMoist = 0;
-		nTotalAet += AET;
+		nTotalAet += GetPrecision(AET);
 		
 		nTotalRain += RainArr[day];
 		Compartments[0].nMoist +=RainArr[day];   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
@@ -86,10 +84,10 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 
 			//  taking into account the AET for this current compartment, and updating the AET value
 			// moist - wieltingPOint is the water available for evaporation
-			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick) < AET)
+			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt) < AET)
 			{
-				AET = AET - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt * thick));
-				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt * thick;
+				AET = AET - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt));
+				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt;
 			}
 			else
 			{
@@ -97,9 +95,9 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 				AET = 0.0;
 			}
 
-			if (Compartments[d].nMoist > (Compartments[d].nWhc*thick)) {
+			if (Compartments[d].nMoist > (Compartments[d].nWhc)) {
 				// determines the leachate by substracting the field capacity from the moisture content
-				nLeachate = Compartments[d].nMoist - (Compartments[d].nWhc)*thick;
+				nLeachate = Compartments[d].nMoist - (Compartments[d].nWhc);
 			}
 			// if there is no excess water, then the leachate is zero
 			else nLeachate = 0.0;
@@ -189,6 +187,11 @@ CSM::~CSM()
 	printf ("csm destructor");
 }
 
+float CSM::GetPrecision(float x)
+{
+	return(((int)(x*10000.0)) / 10000.0F);
+}
+
 void CSM::InitCompartments()
 {
 	Compartment *newCompartment;
@@ -196,7 +199,7 @@ void CSM::InitCompartments()
 	{
 		newCompartment = new Compartment(i, nArea, wieltingPoint, nFieldCapacity, thick, CCa, CSO4);
 		Compartments.push_back(*newCompartment);
-		nTotalWP += wieltingPoint * thick;
+		nTotalWP += wieltingPoint;
 		nTotalWhc += nFieldCapacity * thick;
 		nTotalMoist += newCompartment->nMoist;
 		nInitMoistTotal = nTotalMoist;
