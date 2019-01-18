@@ -374,3 +374,4 @@ ASALocalRun/
 healthchecksdb
 .Rproj.user
 /Rcpp-windows
+*.pdf

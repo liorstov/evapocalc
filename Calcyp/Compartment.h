@@ -1,4 +1,11 @@
 #pragma once
+#include "math.h"
+#include <stdio.h>
+#include <Rcpp.h>
+
+
+using namespace Rcpp;
+using namespace std;
 class Compartment
 {
 public:
@@ -7,7 +14,7 @@ public:
 	~Compartment();
 	
 	float solubility(float temp);
-	float* quadricEquation(float, float, float);
+	pair<float, float> quadricEquation(float, float, float);
 	void setAllToZero();
 	float GetIOnsSum();
 

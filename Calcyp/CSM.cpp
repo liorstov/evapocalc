@@ -30,8 +30,8 @@ CSM::CSM()
 }
 
 
-Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa, float initialSO4,
-float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4)
+Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+ float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
 {
 	nNumOfDays = years * 365;
 	nDepth = Depth;
@@ -62,7 +62,6 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 	//main loop over days
 	for (int day = 0; day < nNumOfDays; day++)
 	{
-		
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
 		 
@@ -74,7 +73,7 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
-
+		AET *= AETFactor;
 		//AET = AET * 10;
 		nTotalMoist = 0;
 		nTotalAet += AET;
@@ -195,7 +194,7 @@ float CSM::meq2mmol(float fMeq, float SoilVolume)
 //input mmol/cm3 return meq/100g soil
 float CSM::mmol2meq(float mmol, float SoilVolume)
 {
-	return (mmol * 2*(1/1.44)*100 * SoilVolume);
+	return ((mmol * 2 /(SoilVolume*1.44))*  100  );
 }
 
  
@@ -271,7 +270,7 @@ void CSM::InitMonths()
 
 MONTH CSM::GetMonth(int nDay)
 {
-	MONTH month;
+	MONTH month = Jan;
 	nDay = JULIAN(nDay);
 	if (nDay <= 31)
 		month = Oct;

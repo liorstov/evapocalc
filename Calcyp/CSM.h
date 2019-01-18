@@ -19,8 +19,9 @@ class CSM
 {
 public:
 	CSM();
-	Rcpp::List Calculate(Rcpp::NumericVector , float years, float Depth, float nthick, float nwieltingPoint, float InitialCa, float initialSO4,
-		float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4);
+	Rcpp::List Calculate(Rcpp::NumericVector, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+ float initialSO4,
+		float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
 	std::vector<Compartment>* GetCompartments();
 	float meq2mmol(float, float);
 	float mmol2meq(float, float);
@@ -69,7 +70,7 @@ public:
 	float nTemp;
 	float nLeachate;
 
-	double TempArr[12] = { 10.2,11.8,14.3,18.1,22.6,27.8,30.0,28.9,26.7,20.8,14.6,10.8 };
+	double TempArr[12] = { 20,21,24.7,29.7,31.4,37.6,39.4,39.4,36.5,32,26.5,27.1};
 };
 
 RCPP_EXPOSED_CLASS(CSM);
