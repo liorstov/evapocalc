@@ -1,7 +1,5 @@
 #include "Compartment.h"
-#include <Rcpp.h>
-#include "math.h"
-#include <stdio.h>
+
 
 Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CSO4)
 {
@@ -22,8 +20,6 @@ Compartment::~Compartment()
 {
 }
 
-// PCO2 is a function that calculates the partial pressure of CO2 in the soil atmosphere - pco2 [ppm] based on the soil depth [cm].
-// We used equations derived from data presented in Table A1 of Marion et al. (2008).
 
 
 
@@ -34,8 +30,8 @@ Compartment::~Compartment()
 float Compartment::solubility(float temp)
 {
 	float I, A, k6, ionActivity, EquilConcentrationConstant, MCa, MSo4, MCaSO4,
-		CurrentConcentrationProduct, GypOmega, alphaGypsum, totalConcentrationProduct, a, b, c, limitation;
-	float * Quadsolutions;
+		CurrentConcentrationProduct, GypOmega, alphaGypsum, a, b, c, limitation;
+	pair<float, float> Quadsolutions;
 
 	//convert to Molar
 	float MoistInLitre = this->nMoist * 0.01;
@@ -55,7 +51,6 @@ float Compartment::solubility(float temp)
 
 	// omega is the difference between current product and equil product
 	GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
-	totalConcentrationProduct = MCa * MSo4;
 
 	// the concentration we need to add or substract to gypsum
 	alphaGypsum = 0;
@@ -63,7 +58,7 @@ float Compartment::solubility(float temp)
 	b = (MCa + MSo4);
 	c = GypOmega;
 	Quadsolutions = quadricEquation(a, b, c);
-	alphaGypsum = fmaxf(Quadsolutions[0], Quadsolutions[1]);
+	alphaGypsum = fmaxf(Quadsolutions.first, Quadsolutions.second);
 
 	// percipitation
 	if (GypOmega >= 0)
@@ -82,6 +77,8 @@ float Compartment::solubility(float temp)
 			alphaGypsum = MCaSO4;
 		}
 	}
+
+	//Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;
 	MCa += alphaGypsum;
 	MSo4 += alphaGypsum;
 	MCaSO4 -= alphaGypsum;
@@ -95,19 +92,16 @@ float Compartment::solubility(float temp)
 	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
 
 	return C_CaSO4;
-		
-	
-	
 }
 
-float * Compartment::quadricEquation(float a, float b , float c)
+pair<float, float> Compartment::quadricEquation(float a, float b , float c)
 {
-	float solutions[2];
-	solutions[0] = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
-	solutions[1] = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	pair<float, float> solutions;
+	solutions.first = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	solutions.second = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
 	return solutions;
 }
-
+     
 
 void Compartment::setAllToZero()
 {
