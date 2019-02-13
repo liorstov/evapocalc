@@ -30,8 +30,8 @@ CSM::CSM()
 }
 
 
-void CSM::Calculate(float * rain, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa, float initialSO4,
-float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4)
+Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+ float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
 {
 	nNumOfDays = years * 365;
 	nDepth = Depth;
@@ -62,7 +62,6 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 	//main loop over days
 	for (int day = 0; day < nNumOfDays; day++)
 	{
-		
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
 		 
@@ -74,7 +73,7 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
-
+		AET *= AETFactor;
 		//AET = AET * 10;
 		nTotalMoist = 0;
 		nTotalAet += AET;
@@ -165,17 +164,17 @@ float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float Du
 		//printf_s("second comp gypsum: %f  \n", Compartments[2].C_CaSO4);
 
 	}
-	//Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
-	//vect.erase(0, vect.length());
-	//for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
-	//	//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
-	//	vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
-	//	//Rcout << "comp gypsum:" << mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)) << endl;
-	//}	
-	//
-	//Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect);
+	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
+	vect.erase(0, vect.length());
+	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
+		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
+		vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
+		//Rcout << "comp gypsum:" << mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)) << endl;
+	}	
+	
+	Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect);
 
-	//return returnList;
+	return returnList;
 }
 
 std::vector<Compartment>* CSM::GetCompartments()
@@ -195,7 +194,7 @@ float CSM::meq2mmol(float fMeq, float SoilVolume)
 //input mmol/cm3 return meq/100g soil
 float CSM::mmol2meq(float mmol, float SoilVolume)
 {
-	return (mmol * 2*(1/1.44)*100 * SoilVolume);
+	return ((mmol * 2 /(SoilVolume*1.44))*  100  );
 }
 
  
@@ -271,7 +270,7 @@ void CSM::InitMonths()
 
 MONTH CSM::GetMonth(int nDay)
 {
-	MONTH month;
+	MONTH month = Jan;
 	nDay = JULIAN(nDay);
 	if (nDay <= 31)
 		month = Oct;
@@ -321,17 +320,16 @@ float CSM::JULIAN(int day)
 	return julian;
 }
 
-//// [[Rcpp::plugins(cpp11)]]
-//RCPP_MODULE(CSM_MODULE) {
-//	class_<CSM>("CSMCLASS")
-//		.constructor()
-//
-//		.method("Calculate", &CSM::Calculate,
-//			"Docstring for stats")
-//		.method("test", &CSM::test,
-//			"tst")
-//
-//		.method("InitMonths", &CSM::InitMonths, "desc")
-//		.field("RainArr", &CSM::RainArr, "rain array")
-//		;
-//}
+// [[Rcpp::plugins(cpp11)]]
+RCPP_MODULE(CSM_MODULE) {
+	class_<CSM>("CSMCLASS")
+		.constructor()
+
+		.method("Calculate", &CSM::Calculate,
+			"Docstring for stats")
+		
+
+		.method("InitMonths", &CSM::InitMonths, "desc")
+		.field("RainArr", &CSM::RainArr, "rain array")
+		;
+}
