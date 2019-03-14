@@ -73,6 +73,7 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, float years, float Depth, fl
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*Months[(int)GetMonth(day)].PanDaily;
 		}
+		Months[nMonth].totalAET += AET;
 		AET *= AETFactor;
 		//AET = AET * 10;
 		nTotalMoist = 0;
@@ -164,15 +165,24 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, float years, float Depth, fl
 		//printf_s("second comp gypsum: %f  \n", Compartments[2].C_CaSO4);
 
 	}
+	// create list with all compartment
 	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
 	vect.erase(0, vect.length());
 	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
 		vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
-		//Rcout << "comp gypsum:" << mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)) << endl;
+		
 	}	
 	
-	Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect);
+	//create a list of months
+	Rcpp::DoubleVector monthsVector = Rcpp::DoubleVector::create();
+	for (std::vector<Month>::iterator it = Months.begin(); it != Months.end(); it++)
+	{
+		monthsVector.push_back(it->totalAET / years);
+	}
+
+
+	Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect, _["month"] = monthsVector);
 
 	return returnList;
 }

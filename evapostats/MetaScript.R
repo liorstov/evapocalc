@@ -20,8 +20,8 @@ Observed = RawData2Compartments(Observed, 5);
 Observed$depth_roof = Observed$compartment * 5;
 
 
-temp = EilatData
-newval = (temp[which(temp[, 1] > 20, 1), 1]) * 0.3
+temp = SedomData
+newval = (temp[which(temp[, 3] > 20, 3), 3]) * 0.3
 temp[which(temp[, 1] > 20, 1), 1] = newval
 
 Rcpp::sourceCpp('C:/Users/Lior/master/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
@@ -81,7 +81,7 @@ dustplot = ggplot(data = results, mapping = aes(x = results$DustCa, y = results$
     labs(x = "yearly dust flux [g/m-2/yr-1]", y ="Gypsum accumulation depth difference [cm]",
     title = "sensitivity test for dust flux") + theme(text = element_text(size = 15, face = "bold"));
 
-ggsave("plots/sensitivityWP.png" )
+ggsave("plots/measuredOnly.png" )
 
 #sensitivity test for AESFactor
 ETPlot = ggplot(data = results, mapping = aes(x = results$AETFactor, y = results$difference.observedArray.)) + geom_point(se = FALSE) +
@@ -102,15 +102,18 @@ ggplot(results, aes(x = results$RainFactor, y = results$AETFactor, z = results$d
     labs(x = "Rain Depth Factor", y = "Evaporation Factor", fill = "Gypsum accumulation\ndepth difference [cm]\n",
     title = "Response Surface for rain and evaporation factor") + theme(text = element_text(size = 15), legend.text = element_text(size = 12)) 
 
-   
+monthDF = as.data.frame(monthAET);
+monthDF$month = factor(month.abb, levels = month.abb)
+ggplot(data = monthDF, aes(x = month, y = monthAET)) + geom_bar(stat = "identity") +
+    labs(y = "Average monthly AET [cm]", x = "" , title = "Average monthly AET for 10 ka" )
 
 #plor gypsum profile
 melted = melt(Observed, id.vars = "depth_roof")
 melted$lineType = "solid";
 melted$lineType[which(melted$variable == "Calculated")] = "dashed";
-ggplot(data = melted[which(melted$variable %in% c("Calculated", "shehoret1.MP", "shehoret3.MP", "zeelim.12H", "zeelim.13H", "zeelim.11MH" ,"zeelim.2EH", "zeelim.1EH")),],
+ggplot(data = melted[which(melted$variable %in% c( "shehoret1.MP", "shehoret3.MP", "zeelim.12H", "zeelim.13H", "zeelim.11MH" ,"zeelim.2EH", "zeelim.1EH")),],
     mapping = aes(x = value, y = depth_roof,, group = variable, colour = variable, linetype = lineType)) + geom_path() + scale_y_reverse() +
-    labs(x = "Gypsum [meq/100 gr soil]", y = "Depth [cm]", colour = "Site name", title = "Validation results for Shehoret\nEilat rain series") +
+    labs(x = "Gypsum [meq/100 gr soil]", y = "Depth [cm]", colour = "Site name", title = "Measured Data") +
     scale_linetype_manual(values = c("solid", "solid")) + guides(linetype = FALSE) + theme(text = element_text(size = 20));
 
 

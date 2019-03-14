@@ -12,6 +12,8 @@ public:
 	float PanDaily;
 	float PETdaily;
 	float PET;
-	float pan;
+	float pan;	
+	float totalAET;
+
 };
 
