@@ -36,6 +36,7 @@ CalcGypsum <- function(raindata = SedomData[, 3], years = 10000, Depth = 200, th
     b = new(CSMCLASS);
     list = b$Calculate(raindata*RainFactor, years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
                    DustCa, DustSO4, AETFactor);
+    monthAET <<- (list$month);
     observedArray = observedArray[!is.na(observedArray)]
     observedArray = cbind.fill(observedArray, list$gypsum, fill = NA)
     #print(observedArray)
