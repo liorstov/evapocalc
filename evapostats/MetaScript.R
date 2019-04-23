@@ -1,13 +1,13 @@
 
 install.packages("tidyverse")
-    require(Rcpp)
+require(Rcpp)
 require(ggplot2)
 require(reshape2)
 require(tidyr)
 require(dplyr)
 require(plyr)
 require(rowr)
-library(tictoc)
+require(tictoc)
 
 source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
 
