@@ -50,6 +50,23 @@ CalcGypsum <- function(raindata = SedomData[, 3], years = 10000, Depth = 200, th
                    DustCa, DustSO4, RainFactor, AETFactor));
 }
 
+#this function get a simulated rain series and PET to K table. returns the PET for every day in the
+#Simulated series
+PETSeries <- function(raindata, K.Pet) {
+    raindata[, 4] = lag(raindata[, 3], default = 0);
+    raindata$K = apply(raindata[, 3:4], 1, FUN = function(X) GetKforDay(X[1], X[2]));
+    raindata$month = (raindata[, 2] %/% 31) + 1;
+
+    #The first day equal to the mean of its category
+    firstDayIndex = which(K.month.table$K == raindata$K[1] & K.month.table$month == raindata$month[1]);
+    raindata$PET[1] = K.month.table$mean[firstDayIndex];
+
+    #calculate the rest of the days
+    PreviousDayGlobalVar <<- raindata$PET[1];
+    raindata$PET[1:365000] = apply(raindata[1:365000, 5:6], 1, FUN = function(X) PETPerDay(X[2],X[1]));
+    
+}
+
 RawData2Compartments <- function(data, compartmentThick) {
     data$compartment = as.integer(data$depth_roof) %/% compartmentThick + 1
 

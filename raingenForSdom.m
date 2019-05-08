@@ -9,14 +9,14 @@ Fd=0.06441*(9)-0.2562;
 Fw=-1.897*(1.3)^(-1.187)+1.896;
 
 %get rain
-cd('C:\Users\Lior\master\evapocalc');
+cd('C:\Users\Lior\master\evapocalc\evapostats');
 eilat = csvread('Eilat.csv', 1);
 eilat = eilat(:,1:2);
 
 Sedom = csvread('C:\Users\Lior\master\evapocalc\evapostats\sedom.csv', 1);
 Sedom = Sedom(:,1:2);
 
-station = Sedom;
+station = eilat;
 stationDate = station(:,1);
 stationRain = station(:,2);
 
@@ -26,14 +26,14 @@ yy=wblpdf(xx,pd.A,pd.B); %fitted line
 plot(yy)
 %data = RainGen(DataLength,A,B,DepthLimit,Fw*P_WAW,Fd*P_WAD);
 
-cd('C:\Users\Lior\master\evapocalc');
+cd('C:\Users\Lior\master\evapocalc\evapostats');
 eilat = csvread('Eilat.csv', 1);
 eilat = eilat(:,1:2);
 
 Sedom = csvread('C:\Users\Lior\master\evapocalc\evapostats\sedom.csv', 1);
 Sedom = Sedom(:,1:2);
 
-station = Sedom;
+station = eilat;
 stationDate = station(:,1);
 stationRain = station(:,2);
 
@@ -54,20 +54,7 @@ for i=2:length(SerialRain)
     SerialRain(i,3)=SerialRain(i,1) - SerialRain(i-1,1);
 end
 
-bla = SerialRain(SerialRain(:,3) == 1,:);
-
-counter = 1;
-for i=2:length(bla)
-    if (bla(i,1)-bla(i-1,1) ~= 1)
-        bla(i-1,4) = counter;
-        counter = 1;
-    else
-        counter = counter + 1;
-    end
-    
-end
-bla = bla(bla(:,4) ~= 0,:);
-eventDurationMean =  mean(bla(:,4));
+eventDurationMean =  mean(SerialRain(:,3));
 dailyMean = mean(SerialRain(:,2));
 meanAnualRain = mean(splitapply(@sum, SerialRain(:,2), findgroups(SerialRain(:,4))));
 

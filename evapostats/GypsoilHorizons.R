@@ -42,10 +42,12 @@ remove(con)
 con = odbcConnect("soils")
 
 ##create dataframe from horizons
-dataframe = tbl_df(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1 from horizons,sites where sites.siteid=horizons.siteid and (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
-
+dataframe = tbl_df(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1,sites.AvgAge  from horizons,sites where (sites.siteid=horizons.siteid) and  (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
+ages = tbl_df(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age"));
+dataframe = dataframe %>% full_join(ages, by = c("AgeClass1" = "ageclass"))
 #omit na
 dataframe = dataframe[which(!is.na(dataframe$caso4)),];
+dataframe = dataframe[which(!is.na(dataframe$AgeClass1)),];
 
 
 # filter by arid environment
@@ -99,8 +101,11 @@ my.plot3 = xyplot(top ~ mean | paste("Age: ", AgeClass1), data = caso4.slab.site
                         ylim = c(105, -5), xlim = c(-10, 70), layout = c(4, 1),
                         panel = panel.depth_function,
                   prepanel = prepanel.depth_function,
+            par.strip.text = list(cex = 0.6, lines = 2.2),
+
                    auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom())
 
+ggplot(data = dataframe, mapping = aes(x = AgeClass1, y = MeanAnnualPrecipitation, group = siteid)) + geom_point()
 
 #write.csv(x = top.ca.per.site,file = "SlabOutput.csv")
 pdf(file = paste(format(Sys.time(), "%b_%d_%Y"),"soilPlotage.pdf"))
