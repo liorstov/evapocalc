@@ -2,10 +2,8 @@ require(lubridate)
 require(moments)
 require(plyr)
 
-GetKforDay <- function(DayRow) {
-    DayRow = as.numeric(DayRow);
-    CurrentDay = DayRow[1];
-    PrevDay = DayRow[3];
+GetKforDay <- function(CurrentDay, PrevDay) {
+   
     if ((CurrentDay == 0) & (PrevDay == 0)) {
         return(1);
     }
@@ -41,19 +39,25 @@ GammaCorrection <- function(skew, rPen) {
 }
    
 PETPerDay <- function(month, K) {
-    dayCategoryIndex = which(K.month.table$K == K & K.month.table$month == month);
+   
+    dayCategoryIndex = head(which(K.month.table$K == K & K.month.table$month == month),1);
+
+    if (!length(dayCategoryIndex)) {
+        return(PreviousDayGlobalVar);
+    }
     meanPet = K.month.table$mean[dayCategoryIndex];
     std = K.month.table$std[dayCategoryIndex];
     rPet = K.month.table$rPen[dayCategoryIndex];
     SigmaCorrection = K.month.table$Corection[dayCategoryIndex];
 
     PET = meanPet - rPet * (PreviousDayGlobalVar - meanPet) + SigmaCorrection * std * (1 - rPet ^ 2) ^ 0.5;
+    
     PreviousDayGlobalVar <<- PET;
-    print(PreviousDayGlobalVar);
+
     return(PET);
 }
-PETGen <- function(RainSeries) {
-    RainSeries = ReadFromGeoMateo("DB//EilotPenRain.csv");
+PETGen <- function(fileName = "DB//EilotPenRain.csv") {
+    RainSeries = ReadFromGeoMateo(FileName = fileName);
     #Add column for previous day 
     RainSeries$prevDay = lag(RainSeries$rain, default = 0);
 
@@ -64,7 +68,7 @@ PETGen <- function(RainSeries) {
     RainSeries$month = lubridate::month(RainSeries$DateTime, label = FALSE)
 
     #k is the type of the day: 1:WAW,2:WAD,3:DAW,4DAD
-    RainSeries$K = apply(RainSeries[, 2:4], 1, FUN = function(X) GetKforDay(X));
+    RainSeries$K = apply(RainSeries[, 2:4], 1, FUN = function(X) GetKforDay(X[1],X[3]));
 
     #Prepare grouping by month and K
     RainSeries = RainSeries %>% group_by(K, month);
@@ -100,5 +104,23 @@ PETGen <- function(RainSeries) {
     PreviousDayGlobalVar <<- RainSeries$PET[1];
     RainSeries$PET = apply(RainSeries[, c("month", "K", "prevDay")], 1, FUN = function(X) PETPerDay(X[1], X[2]));
 
-    bla = RainSeries %>% dplyr::group_by(month) %>% dplyr::summarise(mean(PET))
+
+    measured = RainSeries %>% group_by(month);
+    measured = measured %>% dplyr::summarise(
+                                             numElements = n(),
+                                                 meanMeasured = mean(Pen),
+                                                 std = sd(Pen),
+                                                 skew = skewness(Pen),                                               
+                                                )
+    Synt = raindata[1:365000,] %>% group_by(month);
+    Synt = Synt %>% dplyr::summarise(        numElements = n(),
+                                                 meanSynt = mean(PET)
+                                               
+                                                )
+    PETBind = cbind2(measured, Synt);
+    PETBind = melt(PETBind[,c(1,3,8)], id.vars = "month")
+    ggplot(data = PETBind, aes(x = month, y = value, group = variable, color = variable)) + geom_line() +
+    scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+     labs(x = "Mean PET[mm/d]", y = "Month", title = "PET in Eilat \ncalculated vs measured") ;
+    return(RainSeries);
 }

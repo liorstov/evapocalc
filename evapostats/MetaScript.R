@@ -1,5 +1,5 @@
 
-install.packages("tidyverse")
+require(tidyverse)
 require(Rcpp)
 require(ggplot2)
 require(reshape2)
@@ -9,12 +9,15 @@ require(plyr)
 require(rowr)
 require(tictoc)
 
-source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
-
 #set wd
 setwd("C:/Users/Lior/master/evapocalc/");
-EilatData = read.csv("DB/rainseriestemp.csv");
+
+source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
+source("C:/Users/Lior/master/evapocalc/evapostats/PETGen.R");
+
+EilatData = read.csv("DB/rainseriesEilat.csv");
 SedomData = read.csv("DB/RainSeriesSedom.csv");
+k.PET.table = PETGen(fileName = "DB//EilotPenRain.csv");
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
 Observed = RawData2Compartments(Observed, 5);
 Observed$depth_roof = Observed$compartment * 5;
