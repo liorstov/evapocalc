@@ -32,6 +32,13 @@ getPercipitationRange <- function(MAP, range) {
     return(paste(range[Lower], '-', range[Upper], 'mm'));
 }
 
+setAge <- function(class, avg, min, max) { 
+    if (is.na(avg) & !is.na(class)) {
+        avg = (as.numeric(min) + as.numeric(max)) %/% 2;
+    }
+    return(as.numeric(avg));
+}
+
 
 ##code 
 
@@ -42,18 +49,17 @@ remove(con)
 con = odbcConnect("soils")
 
 ##create dataframe from horizons
-dataframe = tbl_df(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1,sites.AvgAge  from horizons,sites where (sites.siteid=horizons.siteid) and  (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
+dataframe = tbl_df(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1 as ageclass,sites.AvgAge  from horizons,sites where (sites.siteid=horizons.siteid) and  (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
 ages = tbl_df(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age"));
-dataframe = dataframe %>% full_join(ages, by = c("AgeClass1" = "ageclass"))
+dataframe = dataframe %>% full_join(ages,"ageclass")
+dataframe$AvgAge = apply(dataframe[c("ageclass", "AvgAge","min_age","max_age")], 1, function(X) setAge(X[1],X[2],X[3],X[4]))
+
 #omit na
 dataframe = dataframe[which(!is.na(dataframe$caso4)),];
-dataframe = dataframe[which(!is.na(dataframe$AgeClass1)),];
-
+dataframe = dataframe[which(!is.na(dataframe$AvgAge)),];
 
 # filter by arid environment
 dataframe = dataframe[which(dataframe$MeanAnnualPrecipitation <= 100),]
-#for some reason some rows are NA so i omit them 
-#dataframe = na.omit(dataframe)
 
 #divide to group according to percipation
 range = unique(dataframe$MeanAnnualPrecipitation);
@@ -72,16 +78,16 @@ site.list = aggregate(dataframe[,] , by=list(dataframe$siteid), head,1)
 #promote to SoilProfileCollection
 
 AQPClass = as.data.frame(dataframe);
-depths(AQPClass) <- siteid ~ depthroof + depthbase 
-site(AQPClass) <- ~ AgeClass1
+depths(AQPClass) <- SiteName ~ depthroof + depthbase 
+site(AQPClass) <- ~ siteid
 
 #slub.structure = horizon thickness cm
 
 caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
-caso4.slab.siteid = slab(AQPClass, fm = AgeClass1 ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
+caso4.slab.siteid = slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
 caso4.slab.siteid = merge(caso4.slab.siteid, temp[, c("siteid", "MeanAnnualPrecipitation")], by = "siteid")
 #this is for the strips
-s
+
 #create plot
 
 my.plot1 = xyplot(top ~ mean | paste("siteid: ",siteid, "\nMAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
@@ -97,7 +103,7 @@ my.plot2 = xyplot(top ~ mean | paste("MAP: ", MeanAnnualPrecipitation), data = c
                   prepanel = prepanel.depth_function,            
                    auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom())
 
-my.plot3 = xyplot(top ~ mean | paste("Age: ", AgeClass1), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
+my.plot3 = xyplot(top ~ mean | paste("Age: ", siteid), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
                         ylim = c(105, -5), xlim = c(-10, 70), layout = c(4, 1),
                         panel = panel.depth_function,
                   prepanel = prepanel.depth_function,
@@ -105,10 +111,11 @@ my.plot3 = xyplot(top ~ mean | paste("Age: ", AgeClass1), data = caso4.slab.site
 
                    auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom())
 
-ggplot(data = dataframe, mapping = aes(x = AgeClass1, y = MeanAnnualPrecipitation, group = siteid)) + geom_point()
+ggplot(data = dataframe, mapping = aes(x = (AvgAge), y = MeanAnnualPrecipitation, group = siteid)) + geom_point() +
+  scale_x_continuous(breaks = seq(0,100000,5000) , limits = c(1,80000))
 
 #write.csv(x = top.ca.per.site,file = "SlabOutput.csv")
 pdf(file = paste(format(Sys.time(), "%b_%d_%Y"),"soilPlotage.pdf"))
-print(my.plot3)
+print(my.plot3)  
 dev.off()
 

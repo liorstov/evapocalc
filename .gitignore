@@ -375,3 +375,5 @@ healthchecksdb
 .Rproj.user
 /Rcpp-windows
 *.pdf
+*.csv
+*.png

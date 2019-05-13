@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <vector>
+#include <stack>
 #include "Compartment.h"
 #include "Month.h"
 
@@ -19,7 +20,7 @@ class CSM
 {
 public:
 	CSM();
-	Rcpp::List Calculate(Rcpp::NumericVector, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+	Rcpp::List Calculate(Rcpp::NumericVector, Rcpp::NumericVector,float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
  float initialSO4,
 		float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
 	std::vector<Compartment>* GetCompartments();
