@@ -1,6 +1,8 @@
 require(lubridate)
 require(moments)
-require(plyr)
+require(dplyr)
+require(ggplot2)
+require(reshape2)
 
 GetKforDay <- function(CurrentDay, PrevDay) {
    
@@ -56,9 +58,13 @@ PETPerDay <- function(month, K) {
 
     return(PET);
 }
-PETGen <- function(fileName = "DB//EilotPenRain.csv") {
+PETGen <- function(fileName = "..//DB//EilotPenRain.csv") {
     RainSeries = ReadFromGeoMateo(FileName = fileName);
     #Add column for previous day 
+
+    #becasue raw data is mean of 24 hours, still multiply by 24 is inaccurate
+    RainSeries$Pen = RainSeries$Pen * 24;
+
     RainSeries$prevDay = lag(RainSeries$rain, default = 0);
 
     #add column for previous day Pen
@@ -67,7 +73,7 @@ PETGen <- function(fileName = "DB//EilotPenRain.csv") {
     #add column for month
     RainSeries$month = lubridate::month(RainSeries$DateTime, label = FALSE)
 
-    #k is the type of the day: 1:WAW,2:WAD,3:DAW,4DAD
+    #k is the type of the day: 1:DAD,2:WAD,3:DAW,4:WAW
     RainSeries$K = apply(RainSeries[, 2:4], 1, FUN = function(X) GetKforDay(X[1],X[3]));
 
     #Prepare grouping by month and K
@@ -91,36 +97,81 @@ PETGen <- function(fileName = "DB//EilotPenRain.csv") {
     #calculate the gamma correction for the category
     K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
 
-    #adding PET to each day according to K value and month
+    return(K.month.table);
+}
 
-    #Add column
-    RainSeries$PET = NA;
-
-    #The first day equal to the mean of its category
-    firstDayIndex = which(K.month.table$K == RainSeries$K[1] & K.month.table$month == RainSeries$month[1]);
-    RainSeries$PET[1] = K.month.table$mean[firstDayIndex];
-
-    #calculate the rest of the days
-    PreviousDayGlobalVar <<- RainSeries$PET[1];
-    RainSeries$PET = apply(RainSeries[, c("month", "K", "prevDay")], 1, FUN = function(X) PETPerDay(X[1], X[2]));
+plotResults <- function() {
 
 
+    #bind syntetic rain and PET
+    bla = SyntRain %>% group_by(year) %>% dplyr::summarise(annualRain = sum(depth),
+                                                            annualPET = sum(PET));
+
+    bla$yeargroup = bla$year %/% 30;
+
+    bla = bla %>% group_by(yeargroup) %>% dplyr::summarise(std = sd(annualRain),
+                                                            mean = mean(annualRain),
+                                                            meanPET = mean(annualPET))
+   
+
+    blaIMS = IMSRain[which(IMSRain$year >= 1988),] %>% group_by(year) %>% dplyr::summarise(annualRain = sum(vals));
+    IMSannualSD = sd(blaIMS$annualRain)
+    IMSMeanAnnual = mean(blaIMS$annualRain)
+                                            
+    #bind syntetic rain and PET
+    Synt = SyntRain %>% group_by(month);
+    Synt = Synt %>% dplyr::summarise(        
+                                                 meanPET = mean(PET),
+                                                 sumDepth = sum(depth),
+                                                 stdPET = sd(PET)
+                                                )
     measured = RainSeries %>% group_by(month);
-    measured = measured %>% dplyr::summarise(
-                                             numElements = n(),
-                                                 meanMeasured = mean(Pen),
-                                                 std = sd(Pen),
-                                                 skew = skewness(Pen),                                               
-                                                )
-    Synt = raindata[1:365000,] %>% group_by(month);
-    Synt = Synt %>% dplyr::summarise(        numElements = n(),
-                                                 meanSynt = mean(PET)
-                                               
-                                                )
-    PETBind = cbind2(measured, Synt);
-    PETBind = melt(PETBind[,c(1,3,8)], id.vars = "month")
+    measured = measured %>% dplyr::summarise(meanPET = mean(Pen),
+                                             stdPET = sd(Pen))
+
+
+    #stdHistogram rain
+    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "red"), show.legend = FALSE) +
+        geom_vline(xintercept = IMSannualSD, color = "blue" )+ labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6 ")
+
+    #mean histogram rain
+    ggplot2::ggplot(data = bla, aes(mean)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "red"), show.legend = FALSE) +
+        geom_vline(xintercept = IMSMeanAnnual, color = "blue") + labs(title = "annual mean  histogram for 30 yr chunks\nMeasured annual mean is 21.3 ")
+
+    #petcomparison
+    PETBind = cbind(measured = measured, synt = Synt);
+    PETBind = melt(PETBind, id.vars = "month")
     ggplot(data = PETBind, aes(x = month, y = value, group = variable, color = variable)) + geom_line() +
     scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
      labs(x = "Mean PET[mm/d]", y = "Month", title = "PET in Eilat \ncalculated vs measured") ;
-    return(RainSeries);
 }
+
+SynteticPetGen <- function(k.month.table, SyntRain) {
+
+    SyntRain = as_tibble(SyntRain);
+
+    #rain as hydro year
+    SyntRain$month = lubridate::month(lubridate::as_date(SyntRain$day, origin = dmy("01/09/1970") - 1))
+
+    #Add column for previous day 
+    SyntRain$prevDay = lag(SyntRain$depth, default = 0);
+
+    #k is the type of the day: 1:DAD,2:WAD,3:DAW,4:WAW
+    SyntRain$K = apply(SyntRain[, c("depth", "prevDay")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
+
+    #Add column
+    SyntRain$PET = NA;
+
+    #The first day equal to the mean of its category
+    firstDayIndex = which(K.month.table$K == SyntRain$K[1] & K.month.table$month == SyntRain$month[1]);
+    SyntRain$PET[1] = K.month.table$mean[firstDayIndex];
+
+    #calculate the rest of the days
+    PreviousDayGlobalVar <<- SyntRain$PET[1];
+    SyntRain$PET = apply(SyntRain[, c("month", "K")], 1, FUN = function(X) PETPerDay(X[1], X[2]));
+
+    write.csv(SyntRain, "SyntRainPetEilat.csv")
+
+    return(SyntRain[,c("month"  ,   "Depth", "PET")])
+}
+

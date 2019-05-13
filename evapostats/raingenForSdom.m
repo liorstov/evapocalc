@@ -26,7 +26,7 @@ yy=wblpdf(xx,pd.A,pd.B); %fitted line
 plot(yy)
 %data = RainGen(DataLength,A,B,DepthLimit,Fw*P_WAW,Fd*P_WAD);
 
-cd('C:\Users\Lior\master\evapocalc\evapostats');
+cd('C:\Users\Lior\master\evapocalc\');
 eilat = csvread('Eilat.csv', 1);
 eilat = eilat(:,1:2);
 
@@ -54,7 +54,7 @@ for i=2:length(SerialRain)
     SerialRain(i,3)=SerialRain(i,1) - SerialRain(i-1,1);
 end
 
-eventDurationMean =  mean(SerialRain(:,3));
+eventDurationMean = 1;
 dailyMean = mean(SerialRain(:,2));
 meanAnualRain = mean(splitapply(@sum, SerialRain(:,2), findgroups(SerialRain(:,4))));
 
@@ -76,4 +76,4 @@ Fw=-1.897*(eventDurationMean)^(-1.187)+1.896;
  
 data = RainGen(1000,pd.A,pd.B,0.1,Fw*P_WAW,Fd*P_WAD);
 
-csvwrite('..\DB\RainSeriesEilat.csv',data)   
+csvwrite('RainSeriesEilat.csv',data)   

@@ -31,14 +31,15 @@ difference <- function(MatrixOC) {
     return((depthofMaxValueObserved - depthofMaxValue));
 }
 
-CalcGypsum <- function(raindata = SedomData[, 3], years = 10000, Depth = 200, thick = 5, wieltingPoint = 0.04, InitialCa = 0, initialSO4 = 0
+CalcGypsum <- function(raindata = SedomData[, 3], PETData, years = 10000, Depth = 200, thick = 5, wieltingPoint = 0.04, InitialCa = 0, initialSO4 = 0
                        , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.4, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 4.8, RainFactor = 1, observedArray = observedCom, Getresults = FALSE) {
     b = new(CSMCLASS);
-    list = b$Calculate(raindata*RainFactor, years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
+    list = b$Calculate(raindata*RainFactor,PETData, years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
                    DustCa, DustSO4, AETFactor);
     monthAET <<- (list$month);
-    observedArray = observedArray[!is.na(observedArray)]
-    observedArray = cbind.fill(observedArray, list$gypsum, fill = NA)
+    WDVector <<- list$WD;
+    observedArray = observedArray[!is.na(observedArray)];
+    observedArray = cbind.fill(observedArray, list$gypsum, fill = NA);
     #print(observedArray)
     if (Getresults) {
         obsCalc <<- observedArray;

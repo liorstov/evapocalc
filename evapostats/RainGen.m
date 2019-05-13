@@ -30,6 +30,7 @@ for y = 1:SampleLength
         SyntRain(i,2) = i;
         %choose a distribution conditiond on wet/dry previous day
         if  SyntRain(i-1,3)>0
+            %assuming this is a rainy day
             WetDayProb = P_WAW(i);
         else
             WetDayProb = P_WAD(i);

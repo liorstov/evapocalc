@@ -7,7 +7,7 @@ require(tidyr)
 require(dplyr)
 require(plyr)
 require(rowr)
-require(tictoc)
+#require(tictoc)
 
 #set wd
 setwd("C:/Users/Lior/master/evapocalc/");
@@ -15,7 +15,7 @@ setwd("C:/Users/Lior/master/evapocalc/");
 source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
 source("C:/Users/Lior/master/evapocalc/evapostats/PETGen.R");
 
-EilatData = read.csv("DB/rainseriesEilat.csv");
+EilatData = read.csv("DB/SyntRainPetEilat.csv");
 SedomData = read.csv("DB/RainSeriesSedom.csv");
 k.PET.table = PETGen(fileName = "DB//EilotPenRain.csv");
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
@@ -55,7 +55,7 @@ results = sapply(AETArray, FUN = function(X) CalcGypsum(years = 10000, AETFactor
 results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 10000, RainFactor = X, Depth = 200, observedArray = (Observed$zeelim.2EH)));
 
 #tests
-CalcGypsum(raindata = EilatData[, 1], DustCa = 0.5, DustSO4 = 0.5, years = 10000, RainFactor = 0.7, Depth = 200, observedArray = (Observed$shehoret1.MP), Getresults = TRUE);
+CalcGypsum(raindata = EilatData$Depth, EilatData$PET, DustCa = 0.5, DustSO4 = 0.5, years = 1, RainFactor = 0.7, Depth = 200, observedArray = (Observed$shehoret1.MP), Getresults = TRUE);
 Observed$Calculated = obsCalc[, 2]
 Observed[21:40,] = NA;
 
