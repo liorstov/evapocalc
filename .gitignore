@@ -377,3 +377,5 @@ healthchecksdb
 *.pdf
 *.csv
 *.png
+*.txt
+*.Rhistory

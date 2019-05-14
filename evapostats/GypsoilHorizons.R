@@ -61,6 +61,9 @@ dataframe = dataframe[which(!is.na(dataframe$AvgAge)),];
 # filter by arid environment
 dataframe = dataframe[which(dataframe$MeanAnnualPrecipitation <= 100),]
 
+#filter by sitename
+dataframe = dataframe[grep(c("She|ZEL"), dataframe$SiteName),]
+
 #divide to group according to percipation
 range = unique(dataframe$MeanAnnualPrecipitation);
 dataframe$group = apply(dataframe[, c("MeanAnnualPrecipitation")], 1, FUN = function(X) getPercipitationRange(X, range));
@@ -85,16 +88,16 @@ site(AQPClass) <- ~ siteid
 
 caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
 caso4.slab.siteid = slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
-caso4.slab.siteid = merge(caso4.slab.siteid, temp[, c("siteid", "MeanAnnualPrecipitation")], by = "siteid")
+caso4.slab.siteid = merge(caso4.slab.siteid, dataframe[, c("SiteName", "MeanAnnualPrecipitation", "AvgAge")], by = "SiteName")
 #this is for the strips
 
 #create plot
 
-my.plot1 = xyplot(top ~ mean | paste("siteid: ",siteid, "\nMAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
+my.plot1 = xyplot(top ~ mean | paste("siteid:\n",  SiteName, "\nMAP: ", MeanAnnualPrecipitation, "\nAge: ", AvgAge), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
                         ylim = c(105, -5), xlim = c(-10, 70), layout = c(4, 1),
                         panel = panel.depth_function,
                   prepanel = prepanel.depth_function,
-            par.strip.text = list(cex = 0.6, lines = 2.2),
+            par.strip.text = list(cex = 0.5, lines = 5),
                    auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom())
 
 my.plot2 = xyplot(top ~ mean | paste("MAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
@@ -115,7 +118,7 @@ ggplot(data = dataframe, mapping = aes(x = (AvgAge), y = MeanAnnualPrecipitation
   scale_x_continuous(breaks = seq(0,100000,5000) , limits = c(1,80000))
 
 #write.csv(x = top.ca.per.site,file = "SlabOutput.csv")
-pdf(file = paste(format(Sys.time(), "%b_%d_%Y"),"soilPlotage.pdf"))
-print(my.plot3)  
+pdf(file = paste(format(Sys.time(), "%b_%d_%Y"),"soilPlotage.pdf"),paper = "a4" )
+print(my.plot1)  
 dev.off()
 
