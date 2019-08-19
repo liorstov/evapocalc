@@ -80,6 +80,7 @@ PETGen <- function(fileName = "..//DB//EilotPenRain.csv") {
     RainSeries = RainSeries %>% group_by(K, month);
 
     #calculate statistics for each group
+    #This table will supply the reference of penman evaporation for a specific K and month
     K.month.table = RainSeries %>% dplyr::summarise(
                                              numElements = n(),
                                                  mean = mean(Pen),
@@ -131,12 +132,15 @@ plotResults <- function() {
 
 
     #stdHistogram rain
-    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "red"), show.legend = FALSE) +
-        geom_vline(xintercept = IMSannualSD, color = "blue" )+ labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6 ")
-
+    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "Blue"), show.legend = FALSE) +
+        geom_vline(aes(xintercept = IMSannualSD, color = "red")) + geom_vline(aes(xintercept = density(bla$std)$x[which.max(density(bla$std)$y)], color = "Blue"), linetype = "dashed") +
+        labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6 ") 
+    mean( bla$std)
+    
     #mean histogram rain
     ggplot2::ggplot(data = bla, aes(mean)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "red"), show.legend = FALSE) +
-        geom_vline(xintercept = IMSMeanAnnual, color = "blue") + labs(title = "annual mean  histogram for 30 yr chunks\nMeasured annual mean is 21.3 ")
+        geom_vline(xintercept = IMSMeanAnnual, color = "blue") + geom_vline(xintercept = density(bla$mean)$x[which.max(density(bla$mean)$y)], color = "red", linetype = "dashed") +
+        labs(title = "annual mean histogram for 30 yr chunks\nMeasured annual mean is 21.3 ")
 
     #petcomparison
     PETBind = cbind(measured = measured, synt = Synt);

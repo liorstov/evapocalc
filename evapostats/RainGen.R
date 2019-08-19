@@ -2,18 +2,34 @@ require(lubridate)
 require(tibble)
 require(MASS)
 require(actuar)
+library(dplyr)
+
+
+
+remove(con)
+con = odbcConnect("RainEvap")
 
 setwd('C:/Users/Lior/master/evapocalc/evapostats');
-IMSRain = as_tibble(read.csv("Eilat.csv")[seq(1, 4)]);
 
-pd = fitdistr(IMSRain$vals, "weibull")
+#get percipitation for 1988 to current
+IMSRain = tbl_df(sqlQuery(con, "SELECT *, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex  FROM data_dream.precip_daily where (precip_daily.idstation = 347700 and year(precip_daily.time) >= 1988)"));
 
-IMSRain$serial = apply(IMSRain,1, function(X) {
-    lubridate::yday(as.POSIXct.Date(X[1] - 719529, origin = '1970-01-01'));
-})
-IMSRain$year = apply(IMSRain, 1, function(X) {
-    lubridate::year(as.POSIXct.Date(X[1] - 719529, origin = '1970-01-01'));
-})
+#only rain days
+IMSRain = IMSRain[IMSRain$measure > 0,]
+
+pd = fitdistr(IMSRain$measure, "weibull")
+
+#get wet after wet
+IMSRain$prevDay = IMSRain$dayIndex - lag(IMSRain$dayIndex, default = 0);
+IMSRain$WAW = IMSRain$prevDay == 1 | IMSRain$prevDay == -364
+
+#frequency of wet days
+WAWProb =  IMSRain %>% filter(WAW) %>% group_by(dayIndex) %>% summarise(WAWP = n()/nrow(IMSRain))
+WADProb = IMSRain %>% filter(!WAW) %>% group_by(dayIndex) %>% summarise(WADP = n() / nrow(IMSRain))
+WtDaysProb = WAWProb %>% full_join(WADProb)
+WtDaysProb = WtDaysProb %>% replace_na(list(WAWP = 0, WADP = 0))
+
+fitdistr(WtDaysProb$WAWP, "normal")
 
 numOfYears = length(unique(IMSRain$year));
 
@@ -48,6 +64,3 @@ if (SyntRain$Prob[1] <= ProbRainDays$pWAD[1]) {
     SyntRain$Depth = 0;
 }
 
-for (I in seq(1:) {
-
-}
