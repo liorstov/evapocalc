@@ -14,7 +14,7 @@ for y = 1:SampleLength
     %distribution
     seed = rand(365,1);
     
-    %first day follow a dry day
+    %first day follow a dry day	
     %column 2 is for the serial day of the year
     SyntRain(1,2) = 1;
     % high probabilities of wet days result with many wet day occurances,

@@ -14,10 +14,12 @@ setwd("C:/Users/Lior/master/evapocalc/");
 
 source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
 source("C:/Users/Lior/master/evapocalc/evapostats/PETGen.R");
+source("C:/Users/Lior/master/evapocalc/evapostats/RainGen.R");
 
 EilatData = read.csv("DB/SyntRainPetEilat.csv");
 SedomData = read.csv("DB/RainSeriesSedom.csv");
-k.PET.table = PETGen(fileName = "DB//EilotPenRain.csv");
+
+EilatData = GenerateSeries();
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
 Observed = RawData2Compartments(Observed, 5);
 Observed$depth_roof = Observed$compartment * 5;
@@ -31,7 +33,7 @@ Rcpp::sourceCpp('C:/Users/Lior/master/evapocalc/Calcyp/CSM.cpp', verbose = TRUE)
 wiltingPointArray = seq(0.001, 0.1,length = 45);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 1, to = 5, length = 20);
-RainFactorArray = seq(from = 0.05, to = 0.9, length = 20);
+RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
 initIonArray = seq(from = 1, to = 20, length = 45);
 AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 
@@ -52,10 +54,12 @@ results = sapply(wiltingPointArray, FUN = function(X) CalcGypsum(years = 10000, 
 results = sapply(AETArray, FUN = function(X) CalcGypsum(years = 10000, AETFactor = X, Depth = 200, Getresults = FALSE, observedArray = (Observed$zeelim.2EH)));
 
 #rain
-results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 10000, RainFactor = X, Depth = 200, observedArray = (Observed$zeelim.2EH)));
+results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 1000, RainFactor = X, Depth = 100, observedArray = (Observed$zeelim.2EH), raindata= EilatData$depth, PETData = EilatData$PET));
 
 #tests
+CalcGypsum(years = 10000, RainFactor = 1, Depth = 200, observedArray = (Observed$shehoret1.MP), raindata = as.numeric(EilatData$depth), PETData = EilatData$PET, Getresults = TRUE, AETFactor = 1);
 CalcGypsum(raindata = EilatData$Depth, EilatData$PET, DustCa = 0.5, DustSO4 = 0.5, years = 100, RainFactor = 0.7, Depth = 200, observedArray = (Observed$shehoret1.MP), Getresults = TRUE);
+
 Observed$Calculated = obsCalc[, 2]
 Observed[21:40,] = NA;
 

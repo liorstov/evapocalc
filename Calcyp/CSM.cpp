@@ -33,6 +33,7 @@ CSM::CSM()
 Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
  float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
 {
+	printf("asdasd");
 	nNumOfDays = years*365;
 	nDepth = Depth;
 	thick = nthick;	

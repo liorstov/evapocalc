@@ -49,6 +49,9 @@ DistWetDayPreviosWet=SerialRain(SerialRain(:,3)==1,2)
 DistWetDayPreviosDry=SerialRain(SerialRain(:,3)>1,2)
 DistWetDaySerial=SerialRain(:,2)
 
+HstWetAfterWet = hist(DistWetDayPreviosWet,1:1:365);
+HstWetAfterDry = hist(DistWetDayPreviosDry,1:1:365);
+HstWet = hist(DistWetDaySerial,1:1:365);
 PWetAfterWet(1) = 0;
 PWetAfterDry(1) = 0;
 
