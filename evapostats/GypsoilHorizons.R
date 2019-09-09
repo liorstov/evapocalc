@@ -100,12 +100,12 @@ dataplot = dataplot[grep("early", dataplot$ageclass),]
 dataplot = caso4.slab.siteid
 #create plot
 
-my.plot1 = xyplot(top ~ mean | paste("siteid:\n",  SiteName, "\nMAP: ", MeanAnnualPrecipitation, "\nAge: ", ageclass), data = dataplot, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
-                        ylim = c(105, -5), layout = c(7, 4), #, xlim = c(-10, 70)
+my.plot1 = xyplot(top ~ mean | paste(SiteName, "\nMAR: ", MeanAnnualPrecipitation, "mm\n", ageclass), data = dataplot, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper,  ylab = 'Depth [cm]', xlab = list('CaSO4 concentration [meq/100g soil]', cex = 0.5),
+                        ylim = c(105, -5), layout = c(7, 2), #, xlim = c(-10, 70)
                         panel = panel.depth_function,
                   prepanel = prepanel.depth_function,
-            par.strip.text = list(cex = 0.5, lines = 5),
-            scales = list(y = list(tick.number = 4)),
+            par.strip.text = list(cex = 0.80, lines = 4),
+            scales = list(x = list(tick.number = 2, cex = 1)),
                    auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom(),
                    index.cond = list(c(6, 12, 7, 8, 9, 10, 11, 4, 1, 5, 2, 3)))
 

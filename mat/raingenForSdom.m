@@ -76,4 +76,4 @@ Fw=-1.897*(eventDurationMean)^(-1.187)+1.896;
  
 data = RainGen(1000,pd.A,pd.B,0.1,Fw*P_WAW,Fd*P_WAD);
 
-csvwrite('RainSeriesEilat.csv',data)   
+csvwrite('RainSeriesEilatTest.csv',data)   
