@@ -5,23 +5,31 @@ require(actuar)
 library(dplyr)
 library(RODBC)
 library(tictoc)
+require(fitdistrplus)
+require(egg)
+library(lubridate)
+require(pracma)
 
-getDayAmount = function(Random, WetAfterDry, WetAfterWet, PrevDayAmount, RandomRainDepth) {
+
+getDayAmount = function(dayIndex, Random, WetAfterDry, WetAfterWet, PrevDayAmount) {
     getDayAmount = 0;
     WetProb = 0;
     #If prev was wet
-    if (PrevDayAmount > 0) {
+    if (dayIndex == 1) {
+        return(0);
+    }
+    if (PrevDayAmount > 0.1) {
         Wetprob = WetAfterWet
     } else {
         WetProb = WetAfterDry
     }
-    if (Random <= WetProb) {
-        getDayAmount = RandomRainDepth
+    if (Random < WetProb) {
+        getDayAmount = 0;# rweibull(1, shape = 0.4851, scale = 1.3458) + 0.1;
     }
     return(getDayAmount)
 }
 
-CalculateProbabilities = function() {
+CalculateProbabilities = function(IMSRain) {
     #get wet after wet
     IMSRain$prevDay = IMSRain$dayIndex - lag(IMSRain$dayIndex, default = 0);
     IMSRain$WAW = IMSRain$prevDay == 1 | IMSRain$prevDay == -364;
@@ -34,100 +42,103 @@ CalculateProbabilities = function() {
     #Probability by dividing histograms
     PWAW = WAWProb$counts / (lag(WetProb$counts, default = tail(WetProb$counts, 1)));
     PWAD = WADProb$counts / (length(unique(IMSRain$year)) - lag(WetProb$counts, default = tail(WetProb$counts, 1)));
-
+    PWET = WetProb$counts / length(unique(IMSRain$year));
     #create probabilities for every annual day index
-    Prob.Series = bind_cols("PWAW" = PWAW, "PWAD" = PWAD) %>% replace_na(list(PWAW = 0, PWAD = 0));
+    Prob.Series = bind_cols("PWETOrig" = PWET, "PWAWOrig" = PWAW, "PWADOrig" = PWAD, dayIndex = 1:365) %>% replace_na(list(PWAWOrig = 0, PWADOrig = 0));
+    Prob.Series = Prob.Series %>% add_column(month = month(dmy("1-10-2000") + Prob.Series$dayIndex));
+    #smoothing
+    window1 <- 50
+    window2 = 40  
+    Prob.Series = Prob.Series %>%
+        mutate(PWET = stats::filter(stats::filter(Prob.Series$PWETOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2),
+               PWAW = stats::filter(stats::filter(Prob.Series$PWAWOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2),
+               PWAD = stats::filter(stats::filter(Prob.Series$PWADOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2))
 
+   
     return(Prob.Series)
 }
-GenerateSeries = function() {
-    source("C:/Users/Lior/master/evapocalc/evapostats/PETGen.R")
-    setwd('C:/Users/Lior/master/evapocalc/evapostats');
-
+GetImsRain = function(station = 347700) {
+    #stationElat = 347700;
+    #stationSedom = 337000;
     con = odbcConnect("RainEvap")
-    numOfyears = 1000;
+    IMSRain = tbl_df(sqlQuery(con, paste("SELECT *,  year(time) as year,month(time) as month FROM data_dream.precip_daily where ((precip_daily.idstation = 347700))")));
+    RODBC::odbcCloseAll();
+    IMSRain = IMSRain %>% mutate(waterYear = ifelse(month %in% 10:12, year + 1, year)) %>%
+                                 mutate(dayIndex = as.numeric(difftime(time, make_date(waterYear-1,10)))+1)
 
-    #get percipitation for 1988 to current
-    IMSRain = tbl_df(sqlQuery(con, "SELECT *, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex  FROM data_dream.precip_daily where (precip_daily.idstation = 347700 and year(precip_daily.time) >= 1958)"));
+    IMSRain = IMSRain %>% filter(idstation == station)
 
-    #only rain days
-    IMSRain = IMSRain[IMSRain$measure > 0.1,]
+    IMSRain = IMSRain %>% filter(year >= 1948 ,year <= 2017, measure > 0.1)
+    
 
-    pd = fitdistr(IMSRain$measure, "weibull");
+    return(IMSRain)
+}
+GenerateSeries = function(numOfyears = 69000, withEvapo = FALSE, IMSRain) {
 
-    DaysProb = CalculateProbabilities();
-       
+    #    plot(pd, cex.axis = 1.5, cex.lab = 1.5, main = "Daily rainfall depth [mm]")
+    DaysProb = CalculateProbabilities(IMSRain);
     #rain generator ---
 
     DepthLimit = 0.1
     #create the synthetic rain series and pick random values for occurance and possible amount from weibull
-    SynthRain = tibble(
-                day = rep(1:365, numOfyears),
-                year = rep(1:numOfyears, each = 365),
-                RandomForOccurance = runif(length(day)),
-                PotentialAmount = (rweibull(length(day), shape = pd$estimate[1], scale = pd$estimate[2])+DepthLimit),
-                depth = 0);
+    #weibull parameters are taken for francesco
 
-    #First day, assume prev was dry
-    SynthRain$depth[1] = getDayAmount(SynthRain$RandomForOccurance[1], DaysProb$PWAD[1], DaysProb$PWAW[1], 0, SynthRain$PotentialAmount[1])
-    #iterating through the series based on previous row
-    SynthRain$depth[2:nrow(SynthRain)] = sapply(2:nrow(SynthRain), function(X) getDayAmount(
-                                           SynthRain$RandomForOccurance[X],
-                                                DaysProb$PWAD[SynthRain$day[X]],
-                                                DaysProb$PWAW[SynthRain$day[X]],
-                                                SynthRain$depth[X-1],
-                                                SynthRain$PotentialAmount[X]));
+    tic()
+    #create matrix with weibull values for depth
+    weibull = matrix(rweibull(365 * numOfyears, shape = 0.4851, scale = 1.3458) + DepthLimit, nrow = numOfyears, ncol = 365);
+    
+    #matrix with random values 
+    randMat = matrix(runif(365 * numOfyears), nrow = numOfyears, ncol = 365);
+    SynthRain = matrix(0, nrow = numOfyears, ncol = 365);
 
-    finalRainSeries = PETGen(SynthRain);
-    return(finalRainSeries)
+    
+    for (days in 2:ncol(SynthRain)) {
+        SynthRain[, days] = as.numeric((SynthRain[, days - 1] & (randMat[, days] < DaysProb$PWAW[days])) | (!SynthRain[, days - 1] & (randMat[, days] < DaysProb$PWAD[days])));
+    }
+ 
+    SynthRain[which(SynthRain == 1)] = weibull[which(SynthRain == 1)];
+    toc()
+
+    #clear(c("weibull", "randMat"));
+
+
+    if (withEvapo) {
+        SynthRain = PETGen(SynthRain, IMSRain);
+    }
+
+    return(SynthRain) 
     #---
-
 }
 
-plotResults = function() {
+plotResults = function(SynthRain, IMSRain, DaysProb) {
     #graphic---
-    #bind syntetic rain and PET
-    bla = SyntRain %>% group_by(year) %>% dplyr::summarise(annualRain = sum(depth),
-                                                                annualPET = sum(PET));
+    SimRain = as_tibble(melt(SynthRain, value.name = "depth", varnames = c("year", "day")))
+    numOfyears = length(unique(SimRain$year));
 
-    SynthRain$yeargroup = SynthRain$year %/% 30;
+    #wet day prob----
+    SimRainDay = SimRain %>% filter(depth > 0.1) %>% group_by(day) %>% dplyr::summarise(n = n() / numOfyears)
+    IMSday = IMSRain %>% group_by(day = dayIndex) %>% dplyr::summarise(n = n() / 69) 
 
-    chunks = SynthRain %>% group_by(yeargroup) %>% dplyr::summarise(std = sd(annualRain),
-                                                                mean = mean(annualRain),
-                                                                meanPET = mean(annualPET))
+    wetDayProb = SimRainDay %>% left_join(IMSday, by = "day", suffix = c(".sim", ".measure"))
+    wetDayProb$n.measure = wetDayProb %>% dplyr::pull(n.measure) %>% replace_na(replace = 0)
+    p1 =  ggplot(data = wetDayProb, aes(x = day, ymin = 0)) + geom_line(aes(y = n.measure, color = "Measured")) +
+                geom_line(aes(y = n.sim, color = "Calculated"), size = 1.5) + ylab("Wet Probability [-]") + ggtitle(paste(numOfyears, "years"))
+    #----
+     
+    #annual rain----
+    simRainAnn = SimRain %>% filter(depth > 0.1) %>% group_by(year) %>% dplyr::summarise(annualRain = sum(depth), WetDays = n() )
+    IMSRainAnn = IMSRain %>% filter(measure > 0.1) %>% group_by(waterYear) %>% dplyr::summarise(annualRain = sum(measure), WetDays = n())
 
-
-    blaIMS = IMSRain[which(IMSRain$year >= 1988),] %>% group_by(year) %>% dplyr::summarise(annualRain = sum(vals));
-    IMSannualSD = sd(blaIMS$annualRain)
-    IMSMeanAnnual = mean(blaIMS$annualRain)
-
-    #bind syntetic rain and PET
-    Synt = SyntRain %>% group_by(month);
-    Synt = Synt %>% dplyr::summarise(
-                                                     meanPET = mean(PET),
-                                                     sumDepth = sum(depth),
-                                                     stdPET = sd(PET)
-                                                    )
-    measured = RainSeries %>% group_by(month);
-    measured = measured %>% dplyr::summarise(meanPET = mean(Pen),
-                                                 stdPET = sd(Pen))
-
-
-    #stdHistogram rain
-    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "Blue"), show.legend = FALSE) +
-            geom_vline(aes(xintercept = IMSannualSD, color = "red")) + geom_vline(aes(xintercept = density(bla$std)$x[which.max(density(bla$std)$y)], color = "Blue"), linetype = "dashed") +
-            labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6 ")
-    mean(bla$std)
-
+    p2 = ggplot2::ggplot(data = simRainAnn, aes(annualRain)) + stat_density(aes(color = "Calculated"), size = 1.5, geom = "line", bw = 3) +
+         stat_density(data = IMSRainAnn, aes(color = "Measured"), geom = "line", bw = 3) + xlim(0,100) + xlab("Annual rain mm/year")
     #---
-    IMSRain %>% group_by(year) %>% filter(year >1988 ) %>%summarise(sum = sum(measure)) %>% summarise(mean(sum))
-    SynthRain %>% group_by(year) %>% summarise(annual = sum(depth)) %>% summarise(mean(annual))
+    #annual wet days
+    p3 = ggplot2::ggplot(data = simRainAnn, aes(WetDays)) + stat_density(aes(color = "Calculated"), size = 1.5, geom = "line", bw = 1) +
+         stat_density(data = IMSRainAnn, aes(WetDays, color = "Measured"), geom = "line", bw = 1) + scale_x_continuous(breaks = seq(0, 30, 5)) + xlab("# Annual wet days")
+    #---
+     print(ggarrange(p1,p2,p3)   )
+}
 
-    tali = as.tibble( read.csv("C:\\Users\\Lior\\master\\evapocalc\\DB\\RainSeriesEilatTest.csv"))
-    tali %>% group_by(year) %>% summarise(annual = sum(depth)) %>% summarise(mean(annual))
-
-
-    dailymean = IMSRain %>%  summarise(mean = mean(measure)) %>% pull(mean)
-    meanEventsPerYear = IMSRain %>% group_by(year) %>% filter(year > 1988) %>% summarise(n = n()) %>% summarise(mean = mean(n)) %>% pull(mean)
-    eventDurationMean = 1
+waterYearDayToMonth = function(day) {
+    monthIndex = day %% 30
 }
