@@ -379,3 +379,4 @@ healthchecksdb
 
 *.txt
 *.Rhistory
+*.mat
