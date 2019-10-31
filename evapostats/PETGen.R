@@ -38,7 +38,8 @@ GammaCorrection <- function(skew, rPen) {
     }
     else return(nt);
 }
-   
+
+#stochastic auto regressive model
 PETPerDay <- function(month, K, k.month.table) {
    
     dayCategoryIndex = head(which(k.month.table$K == K & k.month.table$month == month), 1);
@@ -59,68 +60,7 @@ PETPerDay <- function(month, K, k.month.table) {
 }
 
 
-plotResults <- function() {
-
-
-    #bind syntetic rain and PET
-    bla = SyntRain %>% group_by(year) %>% dplyr::summarise(annualRain = sum(depth),
-                                                            annualPET = sum(PET));
-
-    bla$yeargroup = bla$year %/% 30;
-
-    bla = bla %>% group_by(yeargroup) %>% dplyr::summarise(stdRain = sd(annualRain),
-                                                            meanRain = mean(annualRain),
-                                                            meanPET = mean(annualPET),
-                                                            stdPET = mean(annualRain))
-   
-
-    blaIMS = IMSRain[which(IMSRain$year >= 1988),] %>% group_by(year) %>% dplyr::summarise(annualRain = sum(measure));
-    IMSannualSD = sd(blaIMS$annualRain)
-    IMSMeanAnnual = mean(blaIMS$annualRain)
-    blaPET = RainSeries %>% group_by(year) %>% dplyr::summarise(annualPET = sum(measure));
-    IMSPETstd = sd(blaPET$annualPET)
-    IMSPETmean = mean(blaPET$annualPET)
-    ##bind syntetic rain and PET
-    #Synt = SyntRain %>% group_by(month);
-    #Synt = Synt %>% dplyr::summarise(        
-                                                 #meanPET = mean(PET),
-                                                 #sumDepth = sum(depth),
-                                                 #stdPET = sd(PET)
-                                                #)
-    #measured = RainSeries %>% group_by(month);
-    #measured = measured %>% dplyr::summarise(meanPET = mean(Pen),
-                                             #stdPET = sd(Pen))
-
-
-    #stdHistogram rain
-    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "Blue"), show.legend = FALSE) +
-        geom_vline(aes(xintercept = IMSannualSD, color = "red")) + geom_vline(aes(xintercept = density(bla$std)$x[which.max(density(bla$std)$y)], color = "Blue"), linetype = "dashed") +
-        labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6" ) 
-    mean(bla$std)
-
-    theme_set(theme_gray(base_size = 18 , axis.text.x = element_text(size = 5)))
-    geomTextSize =6;
-    #mean histogram rain
-    PickMAR = density(bla$meanRain)$x[which.max(density(bla$meanRain)$y)]
-    ggplot2::ggplot(data = bla, aes(meanRain)) + geom_density(aes(color = "Calculated")) +
-        geom_vline(aes(xintercept = IMSMeanAnnual, color = "Measured")) + geom_vline(aes(xintercept = PickMAR, color = "Calculated"), linetype = "dashed") +
-        geom_text(aes(x = PickMAR + 0.3, label = paste(round(PickMAR,1), " [mm / yr]"), y = 0.04, color = "Calculated"), angle = 90, size = geomTextSize) +
-        geom_text(aes(x = IMSMeanAnnual + 0.3, label = paste(round(IMSMeanAnnual,1), " [mm / yr]"), y = 0.04, color = "Measured"), angle = 90, size = geomTextSize) +
-        labs(x = "Mean annual rainfall  [mm/yr]")
-
-    PickSTD = density(bla$stdRain)$x[which.max(density(bla$stdRain)$y)]
-    ggplot2::ggplot(data = bla, aes(stdRain)) + geom_density(aes(color = "Calculated")) +
-        geom_vline(aes(xintercept = IMSannualSD, color = "Measured")) + geom_vline(aes(xintercept = density(bla$stdRain)$x[which.max(density(bla$stdRain)$y)], color = "Calculated"), linetype = "dashed") +
-        geom_text(aes(x = PickSTD + 0.3, label = paste(round(PickSTD, 1), " [mm / yr]"), y = 0.04, color = "Calculated"), angle = 90, size = geomTextSize) +
-        geom_text(aes(x = IMSannualSD + 0.3, label = paste(round(IMSannualSD, 1), " [mm / yr]"), y = 0.04, color = "Measured"), angle = 90, size = geomTextSize) +
-        labs(x = "STD of Mean annual rainfall [mm/yr]")
-
-    #petcomparison   
-    ggplot2::ggplot(data = bla, aes(meanPET)) + geom_density(aes(color = "Calculated")) +
-        geom_vline(aes(xintercept = IMSPETmean, color = "measured PET")) +
-        labs(x = "Annual PET [mm/year]")
-}
-
+#set PET accoring to category
 SynteticPetGen <- function(k.month.table, SyntRain) {
 
     SyntRain = as_tibble(SyntRain);
@@ -150,17 +90,81 @@ SynteticPetGen <- function(k.month.table, SyntRain) {
     return(SyntRain)
 }
 
-PETGen <- function(SyntRain) {
+# for plotting, should be placed somware else
+plotResults <- function() {
+
+
+    #bind syntetic rain and PET
+    bla = SynthRain %>% group_by(year) %>% dplyr::summarise(annualRain = sum(depth))
+                                                            
+
+    bla$yeargroup = bla$year %/% 30;
+
+    bla = bla %>% group_by(yeargroup) %>% dplyr::summarise(stdRain = sd(annualRain),
+                                                            meanRain = mean(annualRain))
+
+
+    blaIMS = IMSRain %>% group_by(year) %>% dplyr::summarise(annualRain = sum(measure));
+    IMSannualSD = sd(blaIMS$annualRain)
+    IMSMeanAnnual = mean(blaIMS$annualRain)
+    blaPET = RainSeries %>% group_by(year) %>% dplyr::summarise(annualPET = sum(measure));
+    IMSPETstd = sd(blaPET$annualPET)
+    IMSPETmean = mean(blaPET$annualPET)
+    ##bind syntetic rain and PET
+    #Synt = SyntRain %>% group_by(month);
+    #Synt = Synt %>% dplyr::summarise(        
+    #meanPET = mean(PET),
+    #sumDepth = sum(depth),
+    #stdPET = sd(PET)
+    #)
+    #measured = RainSeries %>% group_by(month);
+    #measured = measured %>% dplyr::summarise(meanPET = mean(Pen),
+    #stdPET = sd(Pen))
+
+
+    #stdHistogram rain
+    ggplot2::ggplot(data = bla, aes(std)) + geom_histogram(aes(y = ..density..)) + geom_density(aes(color = "Blue"), show.legend = FALSE) +
+        geom_vline(aes(xintercept = IMSannualSD, color = "red")) + geom_vline(aes(xintercept = density(bla$std)$x[which.max(density(bla$std)$y)], color = "Blue"), linetype = "dashed") +
+        labs(title = "STD histogram for 30 yr chunks\nMeasured STD is 13.6")
+    mean(bla$std)
+
+    ggplot2::ggplot(data = bla, aes(y = meanRain)) + geom_boxplot() +
+    ggplot(data = blaIMS, aes(y = annualRain)) + geom_boxplot()
+
+    theme_set(theme_gray(base_size = 18, axis.text.x = element_text(size = 5)))
+    geomTextSize = 6;
+    #mean histogram rain
+    PickMAR = density(bla$meanRain)$x[which.max(density(bla$meanRain)$y)]
+    ggplot2::ggplot(data = bla, aes(meanRain)) + geom_density(aes(color = "Calculated")) +
+        geom_vline(aes(xintercept = IMSMeanAnnual, color = "Measured")) + geom_vline(aes(xintercept = PickMAR, color = "Calculated"), linetype = "dashed") +
+        geom_text(aes(x = PickMAR + 0, label = paste(round(PickMAR, 1), " [mm / yr]"), y = 0.04, color = "Calculated"), angle = 90, size = geomTextSize) +
+        geom_text(aes(x = IMSMeanAnnual + 0, label = paste(round(IMSMeanAnnual, 1), " [mm / yr]"), y = 0.04, color = "Measured"), angle = 90, size = geomTextSize) +
+        labs(x = "Mean annual rainfall  [mm/yr]")
+
+    PickSTD = density(bla$stdRain)$x[which.max(density(bla$stdRain)$y)]
+    ggplot2::ggplot(data = bla, aes(stdRain)) + geom_density(aes(color = "Calculated")) +
+        geom_vline(aes(xintercept = IMSannualSD, color = "Measured")) + geom_vline(aes(xintercept = density(bla$stdRain)$x[which.max(density(bla$stdRain)$y)], color = "Calculated"), linetype = "dashed") +
+        geom_text(aes(x = PickSTD + 0.3, label = paste(round(PickSTD, 1), " [mm / yr]"), y = 0.04, color = "Calculated"), angle = 90, size = geomTextSize) +
+        geom_text(aes(x = IMSannualSD + 0.3, label = paste(round(IMSannualSD, 1), " [mm / yr]"), y = 0.04, color = "Measured"), angle = 90, size = geomTextSize) +
+        labs(x = "STD of Mean annual rainfall [mm/yr]")
+
+    #petcomparison   
+    ggplot2::ggplot(data = bla, aes(meanPET)) + geom_density(aes(color = "Calculated")) +
+        geom_vline(aes(xintercept = IMSPETmean, color = "measured PET")) +
+        labs(x = "Annual PET [mm/year]")
+}
+
+#main function. parameter is a synthetic rain series and measured rain series
+PETGen <- function(SyntRain, IMSRain) {
+
+    #get from DB
     con = odbcConnect("RainEvap")
     RainSeries = tbl_df(sqlQuery(con, "SELECT *, measure as pen, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex FROM data_dream.pet_daily where idstation = 347704 and isnull(measure) = 0"));
 
+    #bind rain
     RainSeries$rain = RainSeries %>% left_join(IMSRain, by = "time") %>% pull(measure.y) %>% replace_na(replace = 0)
 
     #Add column for previous day 
-
-    ##becasue raw data is mean of 24 hours, still multiply by 24 is inaccurate
-    #RainSeries$Pen = RainSeries$Pen * 24;
-
     RainSeries$prevDayRain = lag(RainSeries$rain, default = 0);
 
     #add column for previous day Pen
@@ -193,7 +197,8 @@ PETGen <- function(SyntRain) {
 
     #calculate the gamma correction for the category
     K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
-
+    bla <<- K.month.table;
     PET.rainfall.series = SynteticPetGen(K.month.table, SyntRain)
     return(PET.rainfall.series);
 }
+

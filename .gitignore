@@ -376,6 +376,6 @@ healthchecksdb
 /Rcpp-windows
 *.pdf
 *.csv
-*.png
+
 *.txt
 *.Rhistory

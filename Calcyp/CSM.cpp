@@ -53,7 +53,7 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 25.0F;
 	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 10.0F;
 
-	nTotalWhc = nFieldCapacity * nNumOfCompatments;
+	nTotalWhc = (nFieldCapacity - nwieltingPoint) * nNumOfCompatments;
 	nTotalMoist = wieltingPoint * nNumOfCompatments;
 	nTotalWP = nTotalMoist;
 	InitCompartments();
@@ -72,11 +72,11 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 		nDailyPET = PET[day];
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
-		if (nTotalMoist >= ((0.546*nTotalWhc) + nTotalWP)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
+		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
 			AET = nDailyPET;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
 														//AET=PETdaily[monthperday[day]];
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
-			AET = (nTotalMoist - nTotalWP) / (0.546*nTotalWhc)*nDailyPET;
+			AET = (nTotalMoist / nTotalWhc)*nDailyPET;
 		}
 
 		//Rcout << RainArr[day] << "  "<<AET << "  " << nDailyPET<< "  " << nTotalMoist << "   " << nTotalWP<<  endl;

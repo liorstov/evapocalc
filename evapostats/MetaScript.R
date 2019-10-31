@@ -6,20 +6,26 @@ require(reshape2)
 require(tidyr)
 require(dplyr)
 require(plyr)
-require(rowr)
-#require(tictoc)
+
+theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
+axis.text.x = element_text(size = 25),
+axis.text.y = element_text(size = 25),
+axis.title.y = element_text(size = 25),
+axis.title.x = element_text(size = 25),
+panel.border = element_rect(colour = "black", fill = NA, size = 0)))
+
 
 #set wd
-setwd("C:/Users/Lior/master/evapocalc/");
+setwd("C:/Users/liorst/source/repos/evapocalc");
 
-source("C:/Users/Lior/master/evapocalc/evapostats/Functions.R");
-source("C:/Users/Lior/master/evapocalc/evapostats/PETGen.R");
-source("C:/Users/Lior/master/evapocalc/evapostats/RainGen.R");
+source("evapostats/Functions.R");
+source("evapostats/PETGen.R");
+source("evapostats/RainGen.R");
 
-EilatData = read.csv("DB/SyntRainPetEilat.csv");
-SedomData = read.csv("DB/RainSeriesSedom.csv");
+IMSRain = GetImsRain();
+SynthRain = GenerateSeries(IMSRain = IMSRain)
+plotResults(SynthRain, IMSRain);
 
-EilatData = GenerateSeries();
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
 Observed = RawData2Compartments(Observed, 5);
 Observed$depth_roof = Observed$compartment * 5;
