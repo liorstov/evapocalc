@@ -43,6 +43,7 @@ CalculateProbabilities = function(IMSRain) {
     PWAW = WAWProb$counts / (lag(WetProb$counts, default = tail(WetProb$counts, 1)));
     PWAD = WADProb$counts / (length(unique(IMSRain$year)) - lag(WetProb$counts, default = tail(WetProb$counts, 1)));
     PWET = WetProb$counts / length(unique(IMSRain$year));
+
     #create probabilities for every annual day index
     Prob.Series = bind_cols("PWETOrig" = PWET, "PWAWOrig" = PWAW, "PWADOrig" = PWAD, dayIndex = 1:365) %>% replace_na(list(PWAWOrig = 0, PWADOrig = 0));
     Prob.Series = Prob.Series %>% add_column(month = month(dmy("1-10-2000") + Prob.Series$dayIndex));
@@ -89,7 +90,7 @@ GenerateSeries = function(numOfyears = 69000, withEvapo = FALSE, IMSRain) {
     
     #matrix with random values 
     randMat = matrix(runif(365 * numOfyears), nrow = numOfyears, ncol = 365);
-    SynthRain = matrix(0, nrow = numOfyears, ncol = 365);
+    SynthRain = matrix(0, nrow = numOfyears, ncol = 365, dimnames = list(1:numOfyears, 1:365))
 
     
     for (days in 2:ncol(SynthRain)) {
@@ -99,6 +100,7 @@ GenerateSeries = function(numOfyears = 69000, withEvapo = FALSE, IMSRain) {
     SynthRain[which(SynthRain == 1)] = weibull[which(SynthRain == 1)];
     toc()
 
+   
     #clear(c("weibull", "randMat"));
 
 
@@ -115,8 +117,22 @@ plotResults = function(SynthRain, IMSRain, DaysProb) {
     SimRain = as_tibble(melt(SynthRain, value.name = "depth", varnames = c("year", "day")))
     numOfyears = length(unique(SimRain$year));
 
+    #dividing the sim series to grups 
+    SimRain$SeriesNumber = SimRain$year %/% length(unique(IMSRain$year));
+
     #wet day prob----
-    SimRainDay = SimRain %>% filter(depth > 0.1) %>% group_by(day) %>% dplyr::summarise(n = n() / numOfyears)
+    SimRainDay = as_tibble((SynthRain > 0.1) * 1);
+    SimRainDay = SimRainDay %>% add_column(series = (1:nrow(SimRainDay) - 1) %/% 69);
+    SimRainDay = SimRainDay %>% group_by(series) %>% drop %>% dplyr::summarise_all(sum) / 69;
+    bla1 = as_tibble(melt(SimRainDay[, 2:ncol(SimRainDay)])) %>% group_by(day = variable) %>%
+                                dplyr::summarise(min = quantile(value, 0.05), median = quantile(value, 0.5), max = quantile(value, 0.95))
+    quantile(SimRainDay[, 40])
+    bla1= as_tibble(apply(SimRainDay, 2, FUN = quantile))
+    bla2 = bla1 %>% gather(key = var_name, value = value) %>% spread(key = names(bla1), value = "value");
+
+    SimRainDay = colSums(SimRainDay)
+    SimRainDay = SimRain %>% filter(depth > 0.1) %>% group_by(SeriesNumber) %>% group_by(day) %>% arrange(SeriesNumber)
+    SimRainDay = SimRain %>% filter(depth > 0.1) %>% group_by(day) %>% dplyr::summarise(n = n() / numOfyears, qu = quantiles()) 
     IMSday = IMSRain %>% group_by(day = dayIndex) %>% dplyr::summarise(n = n() / 69) 
 
     wetDayProb = SimRainDay %>% left_join(IMSday, by = "day", suffix = c(".sim", ".measure"))
@@ -130,7 +146,9 @@ plotResults = function(SynthRain, IMSRain, DaysProb) {
     IMSRainAnn = IMSRain %>% filter(measure > 0.1) %>% group_by(waterYear) %>% dplyr::summarise(annualRain = sum(measure), WetDays = n())
 
     p2 = ggplot2::ggplot(data = simRainAnn, aes(annualRain)) + stat_density(aes(color = "Calculated"), size = 1.5, geom = "line", bw = 3) +
-         stat_density(data = IMSRainAnn, aes(color = "Measured"), geom = "line", bw = 3) + xlim(0,100) + xlab("Annual rain mm/year")
+         stat_density(data = IMSRainAnn, aes(color = "Measured"), geom = "line", bw = 3) + xlim(0, 100) + xlab("Annual rain mm/year")
+    mean(simRainAnn$WetDays)
+    mean(IMSRainAnn$WetDays)
     #---
     #annual wet days
     p3 = ggplot2::ggplot(data = simRainAnn, aes(WetDays)) + stat_density(aes(color = "Calculated"), size = 1.5, geom = "line", bw = 1) +
