@@ -4,26 +4,20 @@ require(dplyr)
 require(ggplot2)
 require(reshape2)
 
+#wet = 1, DAW = 2, DAD = 3
 GetKforDay <- function(CurrentDay, PrevDay) {
-    if ((CurrentDay == 0) & (PrevDay == 0)) {
+    
+    if (CurrentDay > 0) {
         return(1);
     }
-    if (CurrentDay > 0 & PrevDay == 0) {
+    if (CurrentDay == 0 & PrevDay > 0) {
         return(2);
     }
-    if (CurrentDay == 0 & PrevDay > 0) {
+    if ((CurrentDay == 0) & (PrevDay == 0)) {
         return(3);
-    }
-    if (CurrentDay > 0 & PrevDay > 0) {
-        return(4);
-    }
+    }    
 }
 
-ReadFromGeoMateo <- function(FileName) {
-    RainSeries = na.omit(read.csv(FileName));
-    RainSeries$DateTime = as.Date(RainSeries$DateTime, format = "%d/%m/%Y")
-    return(RainSeries);
-}
 
 #Calculate Wilson Hilferty correction only ifskewness > 0.1 
 GammaCorrection <- function(skew, rPen) {
@@ -40,54 +34,62 @@ GammaCorrection <- function(skew, rPen) {
 }
 
 #stochastic auto regressive model
-PETPerDay <- function(month, K, k.month.table) {
+PETPerDay <- function(monthodDay, Kday,random, K.month.table) {
    
-    dayCategoryIndex = head(which(k.month.table$K == K & k.month.table$month == month), 1);
+    #dayCategoryIndex = head(which(K.month.table$K == K & K.month.table$month == month), 1);
 
-    if (!length(dayCategoryIndex)) {
-        return(PreviousDayGlobalVar);
-    }
-    meanPet = k.month.table$mean[dayCategoryIndex];
-    std = k.month.table$std[dayCategoryIndex];
-    rPet = k.month.table$rPen[dayCategoryIndex];
-    SigmaCorrection = k.month.table$Corection[dayCategoryIndex];
+    #if (!length(dayCategoryIndex)) {
+        #return(PreviousDayGlobalVar);
+    #}
+  
+    #rPet = K.month.table$rPen[dayCategoryIndex];
+    #SigmaCorrection = K.month.table$Corection[dayCategoryIndex];
 
-    PET = meanPet - rPet * (PreviousDayGlobalVar - meanPet) + SigmaCorrection * std * (1 - rPet ^ 2) ^ 0.5;
+    #PET = meanPet - rPet * (PreviousDayGlobalVar - meanPet) + SigmaCorrection * std * (1 - rPet ^ 2) ^ 0.5;
     
-    PreviousDayGlobalVar <<- PET;
-
-    return(PET);
+    #PreviousDayGlobalVar <<- PET;
+   print(Kday)
+    ret = K.month.table %>% filter(month == monthodDay, K == Kday) %>% dplyr::select(mean, std);
+    
+    return(qnorm(random, ret$mean, ret$std));
 }
 
 
 #set PET accoring to category
-SynteticPetGen <- function(k.month.table, SyntRain) {
-
-    SyntRain = as_tibble(SyntRain);
-
+SynteticPetGen <- function(K.month.table, SynthRain) {
+    tic()
     ##rain as hydro year
-    SyntRain$month = lubridate::month(lubridate::as_date(SyntRain$day, origin = dmy("01/01/1970") - 1))
+    #SynthRain$month = lubridate::month(lubridate::as_date(SynthRain$day, origin = dmy("01/09/1970") - 1))
     
     #Add column for previous day 
-    SyntRain$prevDayRain = lag(SyntRain$depth, default = 0);
+    SynthRain$prevDayRain = lag(SynthRain$rain, default = 0);
 
     #k is the type of the day: 1:DAD,2:WAD,3:DAW,4:WAW
-    SyntRain$K = apply(SyntRain[, c("depth", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
+    SynthRain$Wet = (SynthRain$rain > 0.1) *1
+    SynthRain$daw = (!SynthRain$Wet & SynthRain$prevDayRain)*2 
+    SynthRain$dad = (!SynthRain$Wet & !SynthRain$prevDayRain)*3
+    SynthRain = SynthRain %>% mutate(K = Wet + daw + dad) %>% dplyr::select(-Wet, - daw, - dad, -prevDayRain)
+    #SynthRain$K = apply(SynthRain[, c("rain", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
 
     #Add column
-    SyntRain$PET = NA;
+    #SynthRain$PET = NA;
 
-    #The first day equal to the mean of its category
-    firstDayIndex = which(k.month.table$K == SyntRain$K[1] & k.month.table$month == SyntRain$month[1]);
-    SyntRain$PET[1] = k.month.table$mean[firstDayIndex];
+    ##The first day equal to the mean of its category
+    
+    #firstDayIndex = which(K.month.table$K == SynthRain$K[1] & K.month.table$month == SynthRain$month[1]);
+    #SynthRain$PET[1] = K.month.table$mean[firstDayIndex];
 
-    #calculate the rest of the days
-    PreviousDayGlobalVar <<- SyntRain$PET[1];
-    SyntRain$PET = apply(SyntRain[, c("month", "K")], 1, FUN = function(X) PETPerDay(X[1], X[2], k.month.table));
+    ##calculate the rest of the days
+    #PreviousDayGlobalVar <<- SynthRain$PET[1];
+    #SynthRain$PET = apply(SynthRain[, c("month", "K")], 1, FUN = function(X) PETPerDay(X[1], X[2], K.month.table));
+    SynthRain$rand = runif(nrow(SynthRain))
+   # SynthRain1 = SynthRain[1:3,]  %>% rowwise() %>% mutate(PET = PETPerDay(month, K, rand, K.month.table))
+    SynthRain = SynthRain %>% left_join(K.month.table %>% dplyr::select(K, dayIndex, mean = smoothMean, std = smoothSTD), by = c("dayIndex", "K")) %>%
+                        mutate(PET = qnorm(rand, mean, std))
+    #SynthRain = SynthRain %>% mutate(PET = replace_na(PET, qnorm(rand, mean(K.month.table$mean), mean(K.month.table$std))))
+    paste("PET calc time: ",toc())
 
-    write.csv(SyntRain, "SyntRainPetEilat.csv")
-
-    return(SyntRain)
+    return(SynthRain)
 }
 
 # for plotting, should be placed somware else
@@ -110,16 +112,7 @@ plotResults <- function() {
     blaPET = RainSeries %>% group_by(year) %>% dplyr::summarise(annualPET = sum(measure));
     IMSPETstd = sd(blaPET$annualPET)
     IMSPETmean = mean(blaPET$annualPET)
-    ##bind syntetic rain and PET
-    #Synt = SyntRain %>% group_by(month);
-    #Synt = Synt %>% dplyr::summarise(        
-    #meanPET = mean(PET),
-    #sumDepth = sum(depth),
-    #stdPET = sd(PET)
-    #)
-    #measured = RainSeries %>% group_by(month);
-    #measured = measured %>% dplyr::summarise(meanPET = mean(Pen),
-    #stdPET = sd(Pen))
+   
 
 
     #stdHistogram rain
@@ -155,50 +148,53 @@ plotResults <- function() {
 }
 
 #main function. parameter is a synthetic rain series and measured rain series
-PETGen <- function(SyntRain, IMSRain) {
+PETGen <- function(SynthRain, IMSRain) {
 
-    #get from DB
-    con = odbcConnect("RainEvap")
-    RainSeries = tbl_df(sqlQuery(con, "SELECT *, measure as pen, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex FROM data_dream.pet_daily where idstation = 347704 and isnull(measure) = 0"));
-
-    #bind rain
-    RainSeries$rain = RainSeries %>% left_join(IMSRain, by = "time") %>% pull(measure.y) %>% replace_na(replace = 0)
-
+    IMSPenOnly = IMSRain %>% filter(!is.na(pen))
     #Add column for previous day 
-    RainSeries$prevDayRain = lag(RainSeries$rain, default = 0);
+    IMSPenOnly$prevDayRain = lag(IMSPenOnly$rain, default = 0);
 
     #add column for previous day Pen
-    RainSeries$PenLag = lag(RainSeries$pen, default = 0);
+    IMSPenOnly$PenLag = lag(IMSPenOnly$pen, default = 0);
 
     ##add column for month
-    #RainSeries$month = lubridate::month(RainSeries$DateTime, label = FALSE)
+    IMSPenOnly$month = lubridate::month(IMSPenOnly$time, label = FALSE)
 
-    #k is the type of the day: 1:DAD,2:WAD,3:DAW,4:WAW
-    RainSeries$K = apply(RainSeries[, c("rain", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
+    #k is the type of the day: 1:DAD,2:W,3:DAW,4:WAW
+    IMSPenOnly$K = apply(IMSPenOnly[, c("rain", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
 
-    #Prepare grouping by month and K
-    RainSeries = RainSeries %>% group_by(K, month);
+    #Prepare grouping by day and K
 
     #calculate statistics for each group
     #This table will supply the reference of penman evaporation for a specific K and month
-    K.month.table = RainSeries %>% group_by(K, month) %>% dplyr::summarise(
+    K.month.table = IMSPenOnly %>% group_by(K, dayIndex) %>% dplyr::summarise(
                                                              numElements = n(),
                                                                  mean = mean(pen),
                                                                  std = sd(pen),
-                                                                 skew = skewness(pen),
                                                                  rPen = cor(pen, PenLag)
                                                                 )
+    K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>% left_join(K.month.table, by = c("dayIndex", "K"))
+    k.max.mean = K.month.table %>% filter(K == 3) %>% dplyr::select(dayIndex, maxMean = mean)
+    
+    K.month.table$mean = apply(K.month.table, 1, FUN = function(X) { replace_na(X[4], k.max.mean$maxMean[X[2]]) })
 
     #remove NA std
     K.month.table$std[is.na(K.month.table$std)] = 0;
 
-    #if number of measurments is small the set the corollation to 0.3
-    K.month.table$rPen[which(K.month.table$numElements < 30)] = 0.3
+    K.month.table$smoothMean = 0;
+    K.month.table$smoothSTD = 0;
+    K.month.table$smoothMean[which(K.month.table$K == 1)] = K.month.table %>% filter(K == 1) %>% mutate(K == 1, d = movavg(mean, 30, type = "s")) %>% pull(d)
+    K.month.table$smoothMean[which(K.month.table$K == 2)] = K.month.table %>% filter(K == 2) %>% mutate(K == 2, d = movavg(mean, 30, type = "s")) %>% pull(d)
+    K.month.table$smoothMean[which(K.month.table$K == 3)] = K.month.table %>% filter(K == 3) %>% mutate(K == 3, d = movavg(mean, 30, type = "s")) %>% pull(d)
+
+    K.month.table$smoothSTD[which(K.month.table$K == 1)] = K.month.table %>% filter(K == 1) %>% mutate(K == 1, d = movavg(std, 30, type = "s")) %>% pull(d)
+    K.month.table$smoothSTD[which(K.month.table$K == 2)] = K.month.table %>% filter(K == 2) %>% mutate(K == 2, d = movavg(std, 30, type = "s")) %>% pull(d)
+    K.month.table$smoothSTD[which(K.month.table$K == 3)] = K.month.table %>% filter(K == 3) %>% mutate(K == 3, d = movavg(std, 30, type = "s")) %>% pull(d)
+
 
     #calculate the gamma correction for the category
-    K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
-    bla <<- K.month.table;
-    PET.rainfall.series = SynteticPetGen(K.month.table, SyntRain)
-    return(PET.rainfall.series);
+   # K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
+    PET.rainfall.series = SynteticPetGen(K.month.table, SynthRain)
+    return(PET.rainfall.series$PET);
 }
 

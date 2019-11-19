@@ -8,12 +8,12 @@ require(dplyr)
 require(plyr)
 
 theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
-axis.text.x = element_text(size = 25),
+axis.text.x = element_text(size = 20, angle = 43,hjust = 1),
 axis.text.y = element_text(size = 25),
 axis.title.y = element_text(size = 25),
 axis.title.x = element_text(size = 25),
 panel.border = element_rect(colour = "black", fill = NA, size = 0)))
-
+Sys.setlocale("LC_TIME", "English_Israel.1255");
 
 #set wd
 setwd("C:/Users/liorst/source/repos/evapocalc");
@@ -23,7 +23,7 @@ source("evapostats/PETGen.R");
 source("evapostats/RainGen.R");
 
 IMSRain = GetImsRain();
-SynthRain = GenerateSeries(IMSRain = IMSRain)
+SynthRain = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain, withEvapo = 0)
 plotResults(SynthRain, IMSRain);
 
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
