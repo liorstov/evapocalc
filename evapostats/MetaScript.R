@@ -3,9 +3,7 @@ require(tidyverse)
 require(Rcpp)
 require(ggplot2)
 require(reshape2)
-require(tidyr)
-require(dplyr)
-require(plyr)
+
 
 theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
 axis.text.x = element_text(size = 20, angle = 43,hjust = 1),
@@ -22,9 +20,11 @@ source("evapostats/Functions.R");
 source("evapostats/PETGen.R");
 source("evapostats/RainGen.R");
 
-IMSRain = GetImsRain();
-SynthRain = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain, withEvapo = 0)
-plotResults(SynthRain, IMSRain);
+IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
+rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain, withEvapo = 0)
+PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain)
+rainSeriesResults$SynthRain$PET = PETresults$SynthPET;
+plotResults(rainSeriesResults$SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
 
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
 Observed = RawData2Compartments(Observed, 5);
