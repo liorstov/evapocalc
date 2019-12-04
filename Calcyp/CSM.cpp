@@ -33,7 +33,7 @@ CSM::CSM()
 Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
  float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
 {
-	printf("asdasd");
+	
 	nNumOfDays = years*365;
 	nDepth = Depth;
 	thick = nthick;	
@@ -46,7 +46,6 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 	nFieldCapacity = FieldCapacity * nthick;
 
 	Rcpp::IntegerVector WD = Rcpp::IntegerVector::create();
-
 	// carbonate in dust range from 0.5 to 5 [g m-2 yr-1]. 
 	//I took 0.51 [g m-2 yr-1] = 5.1*10^-5 [g cm-2 yr-1] = 1.4*10^-7 [g cm-2 day-1]
 	// then convert to [mmol cm-2 day-1] 
@@ -63,6 +62,12 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 	int nMonth;
 	float nTemp;
 	float nDailyPET;
+
+	// create list with all compartment
+	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
+	Rcpp::DoubleVector moist = Rcpp::DoubleVector::create();
+	vect.erase(0, vect.length());
+	
 	//main loop over days
 	for (int day = 0; day < nNumOfDays; day++)
 	{
@@ -70,6 +75,7 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 		nMonth = ((day % 365) / 31);
 		nTemp = Months[nMonth].nTemp;
 		nDailyPET = PET[day];
+
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
@@ -167,20 +173,23 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 			nTotalMoist += Compartments[d].nMoist;
 		}
 
-		WD.push_back(nDeepestWetCompartment);
+		WD.push_back(6);
 
 		//Rcout << nDeepestWetCompartment << endl;
 
+		if (day % 365 == 0)
+		{
+			for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
+				//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
+				vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
+				moist.push_back(it->nTotMoist);
+			}
+		}
 
 	}
-	// create list with all compartment
-	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
-	vect.erase(0, vect.length());
-	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
-		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
-		vect.push_back(mmol2meq(it->C_CaSO4, (it->nthick * it->nArea)));
-		
-	}	
+	
+
+
 	
 	//create a list of months
 	Rcpp::DoubleVector monthsVector = Rcpp::DoubleVector::create();
@@ -189,10 +198,12 @@ Rcpp::List CSM::Calculate(Rcpp::NumericVector rain, Rcpp::NumericVector PET, flo
 		monthsVector.push_back(it->totalAET );
 	}
 
+	vect.attr("dim") = Dimension(nNumOfCompatments, years);
+	moist.attr("dim") = Dimension(nNumOfCompatments, years);
 
 	Rcpp::List returnList = Rcpp::List::create(_["gypsum"] = vect,
 		_["month"] = monthsVector,
-		_["WD"] = WD);
+		_["WD"] = WD, _["moist"] = moist);
 
 	return returnList;
 }

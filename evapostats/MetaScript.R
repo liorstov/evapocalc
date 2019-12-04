@@ -3,13 +3,14 @@ require(tidyverse)
 require(Rcpp)
 require(ggplot2)
 require(reshape2)
+require(zoo)
 
 
 theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
 axis.text.x = element_text(size = 20, angle = 43,hjust = 1),
 axis.text.y = element_text(size = 25),
-axis.title.y = element_text(size = 25),
-axis.title.x = element_text(size = 25),
+axis.title.y = element_text(size = 20),
+axis.title.x = element_text(size = 20),
 panel.border = element_rect(colour = "black", fill = NA, size = 0)))
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
@@ -19,12 +20,23 @@ setwd("C:/Users/liorst/source/repos/evapocalc");
 source("evapostats/Functions.R");
 source("evapostats/PETGen.R");
 source("evapostats/RainGen.R");
-
+#stationElat = 347700;
+#stationElatEvap = 347704;
+#stationSedom = 337000;
 IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
-rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain, withEvapo = 0)
-PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain)
-rainSeriesResults$SynthRain$PET = PETresults$SynthPET;
-plotResults(rainSeriesResults$SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
+rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
+PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,40);
+
+SynthRain = rainSeriesResults$SynthRain;
+SynthRain$PET = PETresults$SynthPET;
+SynthRain$K = PETresults$K;
+PETProb = PETresults$PETProb;
+rainProb = rainSeriesResults$DaysProb;
+results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
+
+pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), width = 30, height = 16);
+print(results);
+dev.off()
 
 Observed = as.data.frame(read.csv("DB/measured.CSV"));
 Observed = RawData2Compartments(Observed, 5);
@@ -35,7 +47,8 @@ temp = SedomData
 newval = (temp[which(temp[, 3] > 20, 3), 3]) * 0.3
 temp[which(temp[, 1] > 20, 1), 1] = newval
 
-Rcpp::sourceCpp('C:/Users/Lior/master/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
+Sys.setenv(PATH = "%PATH%;C:/Rtools/gcc-4.6.3/bin;c:/Rtools/bin")
+Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
 wiltingPointArray = seq(0.001, 0.1,length = 45);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 1, to = 5, length = 20);
@@ -63,8 +76,8 @@ results = sapply(AETArray, FUN = function(X) CalcGypsum(years = 10000, AETFactor
 results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 1000, RainFactor = X, Depth = 100, observedArray = (Observed$zeelim.2EH), raindata= EilatData$depth, PETData = EilatData$PET));
 
 #tests
-CalcGypsum(years = 10000, RainFactor = 1, Depth = 200, observedArray = (Observed$shehoret1.MP), raindata = as.numeric(EilatData$depth), PETData = EilatData$PET, Getresults = TRUE, AETFactor = 1);
-CalcGypsum(raindata = EilatData$Depth, EilatData$PET, DustCa = 0.5, DustSO4 = 0.5, years = 100, RainFactor = 0.7, Depth = 200, observedArray = (Observed$shehoret1.MP), Getresults = TRUE);
+CalcGypsum(duration = 10000, RainFactor = 1, Depth = 200, observedArray = (Observed$shehoret1.MP), raindata = as.numeric(EilatData$depth), PETData = EilatData$PET, Getresults = TRUE, AETFactor = 1);
+bla = CalcGypsum(duration = 20, raindata = SynthRain$rain, PETData = SynthRain$PET * 0, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE);
 
 Observed$Calculated = obsCalc[, 2]
 Observed[21:40,] = NA;

@@ -47,7 +47,8 @@ PETPerDay <- function(monthodDay, Kday,random, K.month.table) {
 
 
 #main function. parameter is a synthetic rain series and measured rain series
-PETGen <- function(SynthRain, IMSRain) {
+PETGen <- function(SynthRain, IMSRain, windowSize = 40, windowSize2 = NULL)
+ {
     tic()
     print("calc PET")   
     IMSPenOnly = IMSRain %>% filter(!is.na(pen))
@@ -68,26 +69,26 @@ PETGen <- function(SynthRain, IMSRain) {
                                                              numElements = n(),
                                                                  mean = mean(pen),
                                                                  std = sd(pen)                                                                
-                                                                )
+                                                                ) %>% mutate(std = replace_na(std,0))
     #adding full days represenation
     K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>% left_join(K.month.table, by = c("dayIndex", "K"))
 
     #filling NA days with selected mean values
-    mean.per.day = K.month.table %>% group_by(dayIndex) %>% summarise(meanDay = min(mean, na.rm = 1))
-    K.month.table$mean = apply(K.month.table, 1, FUN = function(X) { replace_na(X[4], mean.per.day$meanDay[X[2]]) })
+    #mean.per.day = K.month.table %>% group_by(dayIndex) %>% summarise(meanDay = min(mean, na.rm = 1))
+    #K.month.table$mean = apply(K.month.table, 1, FUN = function(X) { replace_na(X[4], mean.per.day$meanDay[X[2]]) })
 
-    #remove NA std
-    K.month.table$std[is.na(K.month.table$std)] = 0;
+    ##remove NA std
+    #K.month.table$std[is.na(K.month.table$std)] = 0;
 
-    windowSize = 30;
-    K.month.table = K.month.table %>% group_by(K) %>% mutate(smoothMean = movavg(mean, windowSize, type = "s"), smoothSTD = movavg(std, windowSize, type = "s"))
+    
+    K.month.table = K.month.table %>% group_by(K) %>% mutate(smoothMean = MovingAvarage(mean, windowSize, windowSize2), smoothSTD = MovingAvarage(std, windowSize, windowSize2))
    
 
     #calculate the gamma correction for the category
    # K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
     PET.rainfall.series = SynteticPetGen(K.month.table, SynthRain)
-    toc()
-    return(list(SynthPET = PET.rainfall.series$PET, PETProb = K.month.table));
+    toc() 
+    return(list(SynthPET = PET.rainfall.series$PET,K = PET.rainfall.series$K, PETProb = K.month.table));
 }
 
 #set PET accoring to category
@@ -107,7 +108,8 @@ SynteticPetGen <- function(K.month.table, SynthRain) {
     #add random values
     SynthRain$rand = runif(nrow(SynthRain))
 
-    SynthRain = SynthRain %>% left_join(K.month.table %>% dplyr::select(K, dayIndex, mean = smoothMean, std = smoothSTD), by = c("dayIndex", "K")) %>% mutate(PET = qnorm(rand, mean, std))%>%mutate(PET = ifelse(PET < 0 ,0,PET))
+    SynthRain = SynthRain %>% left_join(K.month.table %>% dplyr::select(K, dayIndex, mean = smoothMean, std = smoothSTD), by = c("dayIndex", "K")) %>%
+                mutate(PET = qnorm(rand, mean, std)) %>% mutate(PET = ifelse(PET < 0 ,0,PET))
    
 
     return(SynthRain)
