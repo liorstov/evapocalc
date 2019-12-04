@@ -58,13 +58,26 @@ CalculateProbabilities = function(IMSRain) {
     window1 <- 50
     window2 = 40  
     Prob.Series = Prob.Series %>%
-        mutate(PWET = stats::filter(stats::filter(Prob.Series$PWETOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2),
-               PWAW = stats::filter(stats::filter(Prob.Series$PWAWOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2),
-               PWAD = stats::filter(stats::filter(Prob.Series$PWADOrig, rep(1 / window1, window1), method = "con", sides = 2, circular = 1), rep(1 / window2, window2), method = "con", circular = 1, sides = 2))
+        mutate(PWET = MovingAvarage(Prob.Series$PWETOrig,window1,window2),
+               PWAW = MovingAvarage(Prob.Series$PWAWOrig, window1, window2),
+               PWAD = MovingAvarage(Prob.Series$PWADOrig, window1, window2))
 
    
     return(Prob.Series)
 }
+MovingAvarage = function(x, win1, win2 = NULL) {
+    ret = rollapply(x, win1, mean, na.rm = TRUE, fill = NA, partial = TRUE)
+    if (!is.null(win2)) {
+        ret = rollapply(ret, win2, mean, na.rm = TRUE, fill = NA, partial = TRUE)
+    }
+
+    #ret = na_ma(x, k = win1, weighting = "simple");
+    #if (!is.null(win2)) {
+        #ret = na_ma(x, k = win2, weighting = "simple");
+    #}
+    return (ret)
+}
+
 GetImsRain = function(station = 347700 ,stationEvap = 347704) {
     #stationElat = 347700;
     #stationElatEvap = 347704;
@@ -93,18 +106,19 @@ GetImsRain = function(station = 347700 ,stationEvap = 347704) {
 
     return(IMSRain)
 }
-GenerateSeries = function(NumOfSeries = 1000, withEvapo = FALSE, IMSRain)
+GenerateSeries = function(NumOfSeries = 1000, IMSRain)
 {
     DaysProb = CalculateProbabilities(IMSRain);    
     DepthLimit = 0.1
     NumOfSeries <<- NumOfSeries;
     #weibull parameters are taken for francesco
-    station = getStationParam(IMSRain$station[1])
+    station <<- getStationParam(IMSRain$station[1])
     stationName <<- station$stationName;
     
     numOfyears <<- measuredYears * NumOfSeries
     #create the synthetic rain series and pick random values for occurance and possible amount from weibull
     #rain generator ---
+    print("Calculating rain:")
     tic()
 
     #create matrix with weibull values for depth
@@ -123,20 +137,13 @@ GenerateSeries = function(NumOfSeries = 1000, withEvapo = FALSE, IMSRain)
     toc()
 
     #as matrix
-    RainMat <<- SynthRain;
 
     SynthRain = as_tibble(melt(SynthRain, value.name = "rain", varnames = c("year", "dayIndex")))
     #clear(c("weibull", "randMat"));
 
-    if (withEvapo) {
-        tic()
-        print("calc PET")
-        SynthRain$PET = PETGen(SynthRain, IMSRain);
-        print(paste("PET: ", toc()))
-    }
-
+   
     #dividing the sim series to grups 
-    SynthRain$SeriesNumber = SynthRain$SeriesNumber = rep(1:NumOfSeries, each = measuredYears)
+    SynthRain$SeriesNumber = rep(1:NumOfSeries, each = measuredYears)
 
     return(list(SynthRain = SynthRain, DaysProb = DaysProb))
     #---
@@ -151,6 +158,8 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     #graphic--- 
     print("Calculating statistics:",tic())
 
+
+
     #wet day prob----   
     plotLimit = 365;
     histBreaksSize = 1;
@@ -164,14 +173,19 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                     add_column(month = (dmy("1-09-2000") + 0:364)) %>% left_join(IMSRainDay, by = "dayIndex") %>%
                        left_join(rainProb, by="dayIndex");   
 
-    p1 = ggplot(data = SimRainDay, aes(x = month, group = 1)) + geom_line(aes(y = observed, color = "Measured")) + ylab("Wet Probability [-]") +
+    p1 = ggplot(data = SimRainDay, aes(x = month, group = 1)) + geom_line(aes(y = observed, color = "Measured")) + ylab("Wet Probability [-]") + xlab("") +
                                 geom_line(aes(y = Simulated, color = "Simulated"), size = 1.5) +
-                                geom_line(aes(y = PWET, color = "PWET"), size = 1) +
-                                geom_line(aes(y = PWAW, color = "PWAW"), size = 1) +
-                                geom_line(aes(y = PWAD, color = "PWAD"), size = 1) +
+                                geom_line(aes(y = PWET, color = "WET")) +
                                 ggtitle(paste(numOfyears, "years for", stationName)) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
                                    scale_x_date(date_labels = "%B", expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0.0));
+
+    rainProbabilities = ggplot(data = SimRainDay, aes(x = month, group = 1)) +                               
+                                geom_line(aes(y = PWET, color = "WET")) +
+                                geom_line(aes(y = PWAW, color = "WAW")) +
+                                geom_line(aes(y = PWAD, color = "WAD")) +
+                                   scale_x_date(date_labels = "%B", expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0.0))+ ylab("Wet Probability [-]") + xlab("");
+
 
     #rm(SimRainDay, IMSRainDay)
     print("20%")
@@ -181,7 +195,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     #annual rain----
 
     #histogram for observed
-    plotLimit = 120;
+    plotLimit = 100;
     histBreaksSize = 5;
 
     #histogram for observed
@@ -207,7 +221,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
    
     #--
     #annual wet days----
-    plotLimit = 40;
+    plotLimit = max(simRainAnn$WetDays);
     histBreaksSize = 1;
     #histogram for observed
     IMSAnnWetDays = hist(IMSRainAnn$WetDays, breaks = seq(-2, plotLimit, histBreaksSize), plot = 0) %>%
@@ -218,6 +232,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                        summarise(a = list(hist(WetDays, breaks = seq(-2, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
                         map(~Hist2tibble(.x)) %>% reduce(bind_rows)
 
+
     #aggregating 
     SimAnnWetDays = SimAnnWetDays %>% group_by(breaks) %>% summarise(simulated = mean(density), min = quantile(density, 0.05), median = quantile(density, 0.5), max = quantile(density, 0.95)) %>%
                 left_join(IMSAnnWetDays, by = "breaks")
@@ -225,7 +240,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     p3 = ggplot(SimAnnWetDays, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
                                 geom_line(aes(y = observed, color = "Measured")) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) + xlab("# Annual wet days") +
-                                     scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(expand = c(0, 0));
+                                     scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(breaks = seq(0, plotLimit, 5), expand = c(0, 0));
     print("60%")
 
    
@@ -238,23 +253,30 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
         plotLimit = 365;
         histBreaksSize = 1;
         #hist for observed
-        IMSPet = IMSRain  %>% filter(!is.na(pen)) %>% group_by(dayIndex) %>% summarise(observed = mean(pen))
-        #hist for simulated
-        SimPETDay = SynthRain %>% group_by(dayIndex, SeriesNumber) %>% summarise(PET = mean(PET)) 
+        IMSPet = IMSRain %>% filter(!is.na(pen)) %>% group_by(dayIndex) %>% summarise(observed = mean(pen))
+        petYears = IMSRain %>% filter(!is.na(pen)) %>% distinct(waterYear) %>% nrow()
+        SynthRain$PETSeries = SynthRain$year %/% petYears;
+
+    
                    
         #aggregating   
-        SimPETDay = SimPETDay %>% group_by(dayIndex) %>% summarise(Simulated = mean(PET), min = quantile(PET, 0.05), median = quantile(PET, 0.5), max = quantile(PET, 0.95)) %>%
+        SimPETDay = SynthRain %>% group_by(dayIndex) %>% summarise(Simulated = mean(PET, na.rm = TRUE), min = quantile(PET, 0.05, na.rm = TRUE), median = quantile(PET, 0.5, na.rm = TRUE), max = quantile(PET, 0.95, na.rm = TRUE)) %>%
                 left_join(IMSPet, by = "dayIndex") %>% left_join(PETProb, by = "dayIndex") %>% mutate(month = (dmy("1-09-2000") + dayIndex)) %>%
                 mutate(K = replace(K, K == 1, "Wet"), K = replace(K, K == 2, "DAW"), K = replace(K, K == 3, "DAD"))
         p4 = ggplot(data = SimPETDay, aes(x = month, group = 1)) + geom_line(aes(y = Simulated, color = "Simulated"), size = 1.5) +
-            geom_line(aes(y = observed, color = "Measured total")) + ylab("PET [mm day\u207B]") +
+            geom_line(aes(y = observed, color = "Measured total")) + ylab("PET [mm / day]") + xlab("") +
             geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
-            scale_x_date(date_labels = "%B", expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0.0)) +
-            geom_line(aes(group = K, y = smoothMean, color = as.factor(paste("Expected",K))))
+            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) +
+            geom_line(aes(group = K, y = smoothMean, color = as.factor(paste(K))))
+
+        p7 = ggplot(data = SimPETDay, aes(x = month, group = 1))  +
+            ylab("PET STD [mm / day]") + xlab("") +
+            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) +
+            geom_line(aes(group = K, y = smoothSTD, color = as.factor(paste(K))))
 
         #--
         #PET density----
-        plotLimit = 20;
+        plotLimit = 15;
         histBreaksSize = 0.1;
 
         #histogram for observed
@@ -262,25 +284,73 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                                                         hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(observed = density)
 
         #histogram for simulated
-        SimPet = SynthRain %>% group_by(SeriesNumber) %>%
+        SimPet = SynthRain %>% group_by(PETSeries) %>%
                        summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
                              map(~Hist2tibble(.x)) %>% reduce(bind_rows)
+
+        #deivide to summer and winter
+        simPetWinter = SynthRain %>% filter(dayIndex <= 365 / 2) %>%
+                       summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                        summarise(simulatedWin = mean(density), minWin = quantile(density, 0.05), medianWin = quantile(density, 0.5), maxWin = quantile(density, 0.95))
+
+        simPetSummer = SynthRain %>% filter(dayIndex > 365 / 2) %>% 
+                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            summarise(simulatedSum = mean(density), minSum = quantile(density, 0.05), medianSum = quantile(density, 0.5), maxSum = quantile(density, 0.95))
+
+        simPetDAW = SynthRain %>% filter(K == 2) %>% 
+                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            summarise(simulatedDAW = mean(density), minDAW = quantile(density, 0.05), medianDAW = quantile(density, 0.5), maxDAW = quantile(density, 0.95))
+
+        rainOnly = SynthRain %>% filter(rain > 0) %>%
+                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            summarise(simulatedRain = mean(density), minRain = quantile(density, 0.05), medianRain = quantile(density, 0.5), maxRain = quantile(density, 0.95))
+
         print("80%")
 
       
         #aggregating 
         SimPetDensity = SimPet %>% group_by(breaks) %>% summarise(simulated = mean(density), min = quantile(density, 0.05), median = quantile(density, 0.5), max = quantile(density, 0.95)) %>%
-                left_join(DailyPET, by = "breaks")
+                left_join(DailyPET, by = "breaks") %>% left_join(simPetWinter, by = "breaks") %>% left_join(simPetSummer, by = "breaks") %>% left_join(rainOnly, by = "breaks") %>% left_join(simPetDAW, by = "breaks")
 
-        p5=  ggplot(SimPetDensity, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
+        p5 = ggplot(SimPetDensity, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
                                 geom_line(aes(y = observed, color = "Measured")) +
-                                geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) + xlab("PET [mm day\u207B]") +
-                                     scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(expand = c(0, 0));
+                                geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
+                                xlab("PET [mm / day]") +
+                                scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
+
+        PETProbabilities = ggplot(SimPetDensity, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
+                                geom_line(aes(y = observed, color = "Measured")) +
+                                geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
+                                geom_line(aes(y = simulatedWin, color = "Simulated Winter")) +
+                                geom_line(aes(y = simulatedSum, color = "Simulated summer")) +
+                                geom_line(aes(y = simulatedRain, color = "Simulated Wet Days")) +
+                                geom_line(aes(y = simulatedDAW, color = "Simulated DAW")) +
+                                xlab("PET [mm / day]") +
+                                scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
+
         #--
         
     }
-    ggarrange(p1, p2, p3, p4, p5)
+
+  
+    p6 = ggplot(tibble(values = rweibull(100000, station$shape, station$scale))) +
+            stat_density(aes(values, color = paste("Weibull\nScale =", station$scale, "\nShape = ", station$shape)), size = 1, geom = "line") +
+               scale_y_continuous(expand = c(0, 0.0)) + scale_x_log10(limits = c(0.001, 1000), expand = c(0, 0)) + labs(x = "", y = "pdf");
+
+    
+
+    
     toc()
+
+    return(ggarrange(p1, rainProbabilities, p2, p3, p6, p4,  p7,p5, PETProbabilities))
+   
+  
+  
+
 }
 
 waterYearDayToMonth = function(day) {

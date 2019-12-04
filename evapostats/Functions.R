@@ -31,25 +31,27 @@ difference <- function(MatrixOC) {
     return((depthofMaxValueObserved - depthofMaxValue));
 }
 
-CalcGypsum <- function(raindata = SedomData[, 3], PETData, years = 10000, Depth = 200, thick = 5, wieltingPoint = 0.04, InitialCa = 0, initialSO4 = 0
-                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.4, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 1, RainFactor = 1, observedArray = observedCom, Getresults = FALSE) {
+CalcGypsum <- function(raindata = SedomData[, 3], PETData, duration, Depth = 200, thick = 5, wieltingPoint = 0.04, InitialCa = 0, initialSO4 = 0
+                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.4, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 1, RainFactor = 1, Getresults = FALSE) {
     b = new(CSMCLASS);
-    list = b$Calculate(raindata*RainFactor,PETData, years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
+    list = b$Calculate(raindata * RainFactor, PETData, duration, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
                    DustCa, DustSO4, AETFactor);
-    print("asdasd");
-    monthAET <<- (list$month);
-    WDVector <<- list$WD;
-    observedArray = observedArray[!is.na(observedArray)];
-    observedArray = cbind.fill(observedArray, list$gypsum, fill = NA);
-    #print(observedArray)
-    if (Getresults) {
-        obsCalc <<- observedArray;
-        print(observedArray)
-    }
+    return(list)
+    #print("asdasd");
+    #monthAET <<- (list$month);
+    #WDVector <<- list$WD;
+    #Gyps <<- list$gypsum;
+    ##observedArray = observedArray[!is.na(observedArray)];
+    ##observedArray = cbind.fill(observedArray, list$gypsum, fill = NA);
+    ###print(observedArray)
+    ##if (Getresults) {
+        ##obsCalc <<- observedArray;
+        ##print(observedArray)
+    ##}
 
-    rm(list);
-    return(data.frame(difference(observedArray), years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
-                   DustCa, DustSO4, RainFactor, AETFactor));
+    #rm(list);
+    #return(data.frame(years, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
+                   #DustCa, DustSO4, RainFactor, AETFactor));
 }
 
 #this function get a simulated rain series and PET to K table. returns the PET for every day in the
