@@ -380,3 +380,4 @@ healthchecksdb
 *.txt
 *.Rhistory
 *.mat
+.RData

@@ -4,6 +4,7 @@ require(Rcpp)
 require(ggplot2)
 require(reshape2)
 require(zoo)
+require(tictoc)
 
 
 theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
@@ -38,23 +39,29 @@ pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), 
 print(results);
 dev.off()
 
-Observed = as.data.frame(read.csv("DB/measured.CSV"));
-Observed = RawData2Compartments(Observed, 5);
-Observed$depth_roof = Observed$compartment * 5;
 
-
-temp = SedomData
-newval = (temp[which(temp[, 3] > 20, 3), 3]) * 0.3
-temp[which(temp[, 1] > 20, 1), 1] = newval
-
-Sys.setenv(PATH = "%PATH%;C:/Rtools/gcc-4.6.3/bin;c:/Rtools/bin")
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
+
+bla = CalcGypsum(SynthRain, duration = 1000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = 0.4);
+k = tibble(WD = bla$WD, soil = bla$totMoist, rain = bla$moist, AET = bla$AET)
+WDSum = k %>% filter(rain > 0) %>% group_by(WD) %>% summarise(n())
+
+gc(reset = TRUE)
+
+#----
+
+FCarray = seq(0.2, 0.4, length = 5);
 wiltingPointArray = seq(0.001, 0.1,length = 45);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 1, to = 5, length = 20);
 RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
 initIonArray = seq(from = 1, to = 20, length = 45);
 AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
+
+results = sapply(seq(FCarray), FUN = function(X) CalcGypsum(SynthRain, duration = 1000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = X));
+results = melt(results);
+
+ggplot(results, aes(x = Var1, y = value, group = factor(Var2))) + geom_smooth(aes(color = factor(Var2))) + ylim(0,200)
 
 #running FLUX AET combination
 results = sapply(seq(1, nrow(AetRainComb)), FUN = function(X) CalcGypsum(years = 1000, RainFactor = AetRainComb[X, 1], AETFactor = AetRainComb[X, 2], observedArray = (Observed$zeelim.2EH)));
@@ -77,7 +84,6 @@ results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 1000, Rai
 
 #tests
 CalcGypsum(duration = 10000, RainFactor = 1, Depth = 200, observedArray = (Observed$shehoret1.MP), raindata = as.numeric(EilatData$depth), PETData = EilatData$PET, Getresults = TRUE, AETFactor = 1);
-bla = CalcGypsum(duration = 20, raindata = SynthRain$rain, PETData = SynthRain$PET * 0, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE);
 
 Observed$Calculated = obsCalc[, 2]
 Observed[21:40,] = NA;
