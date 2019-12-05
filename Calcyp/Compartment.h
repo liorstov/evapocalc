@@ -24,7 +24,7 @@ public:
 	float nThetaWeildingPnt;
 	float nFieldCapacity;
 	float nWhc;					//water holding capacity
-	float	nInitMoist;
+	float nInitTotMoist;
 	float nMoist;				// moisture level
 	float nCCa;					//soluble Ca ion [mmol]
 	float C_SO4;				//solunle so4 anion [mmol]
@@ -35,6 +35,7 @@ public:
 	float nTotMoist;			//summing the total moisture in the soil profile. if there are 10 compartments of 10cm each, total moisture is 8.05cm
 	float CcaLess;
 	float CSO4Less;
+	int nWetCount;
 
 };
 

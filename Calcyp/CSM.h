@@ -20,14 +20,14 @@ class CSM
 {
 public:
 	CSM();
-	Rcpp::List Calculate(Rcpp::NumericVector, Rcpp::NumericVector,float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
- float initialSO4,
-		float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
+	void Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector,float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+						float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
 	std::vector<Compartment>* GetCompartments();
 	float meq2mmol(float, float);
 	float mmol2meq(float, float);
 	~CSM();
 	float GetPrecision(float);
+	Rcpp::List GetResults();
 	int nNumOfDays;
 	float nDepth;
 	float thick;
@@ -47,7 +47,7 @@ public:
 	float BulkDensity;
 	float accumolateDustDays;
 	
-
+	Rcpp::List results;
 	void InitCompartments();
 	MONTH GetMonth(int nDay);
 	float JULIAN(int day);

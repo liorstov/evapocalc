@@ -109,7 +109,7 @@ SynteticPetGen <- function(K.month.table, SynthRain) {
     SynthRain$rand = runif(nrow(SynthRain))
 
     SynthRain = SynthRain %>% left_join(K.month.table %>% dplyr::select(K, dayIndex, mean = smoothMean, std = smoothSTD), by = c("dayIndex", "K")) %>%
-                mutate(PET = qnorm(rand, mean, std)) %>% mutate(PET = ifelse(PET < 0 ,0,PET))
+                mutate(PET = qnorm(rand, mean, std)) %>% mutate(PET = ifelse(PET < 0, 0, PET)) %>% mutate(PET = replace_na(PET,5))
    
 
     return(SynthRain)
