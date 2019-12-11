@@ -36,6 +36,7 @@ public:
 	float CcaLess;
 	float CSO4Less;
 	int nWetCount;
+	float fTotLeachate;
 
 };
 

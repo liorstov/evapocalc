@@ -33,6 +33,7 @@ SynthRain$PET = PETresults$SynthPET;
 SynthRain$K = PETresults$K;
 PETProb = PETresults$PETProb;
 rainProb = rainSeriesResults$DaysProb;
+SynthRain = SynthRain %>% arrange(year, dayIndex);
 results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
 
 pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), width = 30, height = 16);
@@ -42,15 +43,19 @@ dev.off()
 
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
 
-bla = CalcGypsum(SynthRain, duration = 1000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = 0.4);
+bla = CalcGypsum(SynthRain, duration = 2000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = 0.4);
 k = tibble(WD = bla$WD, soil = bla$totMoist, rain = bla$moist, AET = bla$AET)
-WDSum = k %>% filter(rain > 0) %>% group_by(WD) %>% summarise(n())
+
+k = tibble(Depth = quantile(bla$WD, seq(0, 1, 0.1))*5, percentile = seq(0, 1, 0.1))
+
+bla$gypsum / 2000
+ggplot(k, aes(Depth, percentile)) + geom_path() + scale_x_reverse() + coord_flip()
 
 gc(reset = TRUE)
 
 #----
 
-FCarray = seq(0.2, 0.4, length = 5);
+FCarray = seq(0.4, 0.4, length = 10);
 wiltingPointArray = seq(0.001, 0.1,length = 45);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 1, to = 5, length = 20);
@@ -58,10 +63,16 @@ RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
 initIonArray = seq(from = 1, to = 20, length = 45);
 AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 
-results = sapply(seq(FCarray), FUN = function(X) CalcGypsum(SynthRain, duration = 1000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = X));
-results = melt(results);
+results = lapply(seq(FCarray), FUN = function(X) CalcGypsum(SynthRain, duration = 2000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = X));
+#list of retrun variables (fucking genius)
+results = results %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>% map(~melt(.x, id.vars = "rowid", measure.vars = "value"))
 
-ggplot(results, aes(x = Var1, y = value, group = factor(Var2))) + geom_smooth(aes(color = factor(Var2))) + ylim(0,200)
+ggplot(results$leachate) + geom_path(aes(value))
+
+ggplot(k, aes(Depth, percentile)) + geom_path() + scale_x_reverse() + coord_flip()
+
+
+ggplot(bla, aes(value, group = L1)) + stat_ecdf(aes(color = factor(L1))) + coord_flip(c(0,10)) + scale_x_reverse() + scale_y_reverse()
 
 #running FLUX AET combination
 results = sapply(seq(1, nrow(AetRainComb)), FUN = function(X) CalcGypsum(years = 1000, RainFactor = AetRainComb[X, 1], AETFactor = AetRainComb[X, 2], observedArray = (Observed$zeelim.2EH)));

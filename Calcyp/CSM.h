@@ -20,7 +20,7 @@ class CSM
 {
 public:
 	CSM();
-	void Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector,float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
+	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector,float years, float Depth, float nthick, float nwieltingPoint, float InitialCa,
 						float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
 	std::vector<Compartment>* GetCompartments();
 	float meq2mmol(float, float);
