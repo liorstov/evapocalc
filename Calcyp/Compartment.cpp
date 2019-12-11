@@ -15,6 +15,7 @@ Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldca
 	this->nArea = area;
 	this->nLastMoist = 0;
 	this->nWetCount = 0;
+	this->fTotLeachate = 0;
 }
 
 Compartment::~Compartment()
