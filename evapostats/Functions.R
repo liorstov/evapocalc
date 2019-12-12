@@ -31,11 +31,15 @@ difference <- function(MatrixOC) {
     return((depthofMaxValueObserved - depthofMaxValue));
 }
 
-CalcGypsum <- function(raindata = SynthRain, duration, Depth = 200, thick = 5, wieltingPoint = 0.04, InitialCa = 0, initialSO4 = 0
-                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.4, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 1, RainFactor = 1, Getresults = FALSE) {
+CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.02, InitialCa = 0, initialSO4 = 0
+                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.19, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 1, RainFactor = 1, Getresults = TRUE) {
     b = new(CSMCLASS);
-    list =  b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
+    list =  b$Calculate(raindata$rain*RainFactor, raindata$PET, duration, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
                    DustCa, DustSO4, AETFactor);
+
+    list$Index30 = which.min(abs(list$CompWash - (list$totalRain * 0.3)));
+    list$WDp80 = quantile(list$WD, 0.8);
+    list$meanWD = mean(list$WD);
 
     #rm(b);
   

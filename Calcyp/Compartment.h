@@ -18,7 +18,7 @@ public:
 	void setAllToZero();
 	float GetIOnsSum();
 
-	int nIndex;
+	float fDepth;
 	int nthick;
 	int nArea;
 	float nThetaWeildingPnt;
@@ -37,6 +37,7 @@ public:
 	float CSO4Less;
 	int nWetCount;
 	float fTotLeachate;
+	float fAETLoss;
 
 };
 

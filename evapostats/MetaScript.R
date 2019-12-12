@@ -12,6 +12,7 @@ axis.text.x = element_text(size = 20, angle = 43,hjust = 1),
 axis.text.y = element_text(size = 25),
 axis.title.y = element_text(size = 20),
 axis.title.x = element_text(size = 20),
+panel.grid.major = element_line(colour = "grey93"),
 panel.border = element_rect(colour = "black", fill = NA, size = 0)))
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
@@ -43,33 +44,52 @@ dev.off()
 
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE);
 
-bla = CalcGypsum(SynthRain, duration = 2000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = 0.4);
-k = tibble(WD = bla$WD, soil = bla$totMoist, rain = bla$moist, AET = bla$AET)
+bla = CalcGypsum(SynthRainEilat, duration = 1000);
 
-k = tibble(Depth = quantile(bla$WD, seq(0, 1, 0.1))*5, percentile = seq(0, 1, 0.1))
+blaLeach = tibble(leachate = bla$CompWash) %>% rowid_to_column %>% mutate(WaterFluxOut = leachate / bla$totalRain, depth = (rowid - 0.5) * 5)
 
-bla$gypsum / 2000
-ggplot(k, aes(Depth, percentile)) + geom_path() + scale_x_reverse() + coord_flip()
+WP1 = ggplot(blaLeach) + geom_bar(aes(x = depth, y = WaterFluxOut), fill = "navyblue", stat = "identity") + scale_x_reverse(expand = c(0, 0.0)) + coord_flip() +
+                    scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                    geom_vline(aes(xintercept = bla$WDp80), color = "red") + geom_text(aes(x = bla$WDp80 + 1, label = paste("WDp80 =", bla$WDp80), y = 0.55), color = "red") +
+                    geom_vline(aes(xintercept = bla$meanWD), color = "orange") + geom_text(aes(x = bla$meanWD + 1, label = paste("meanWD = ", bla$meanWD), y = 0.55), color = "orange") +
+                    geom_vline(aes(xintercept = bla$Index30), color = "yellow4") + geom_text(aes(x = bla$Index30 + 1, label = paste("Index30 = ", bla$Index30), y = 0.50), color = "yellow4")
+
+
+percent = tibble(Depth = quantile(bla$WD, seq(0, 1, 0.1)), WDpercentile = seq(0, 1, 0.1))
+
+WP2 = ggplot(percent, aes(Depth, WDpercentile)) + geom_path(color = "navyblue", size = 0.8) + scale_x_reverse(expand = c(0.001, 0.0)) + coord_flip() + scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                    geom_vline(aes(xintercept = bla$WDp80), color = "red") + geom_text(aes(x = bla$WDp80 + 1, label = paste("WDp80 =", bla$WDp80), y = 0.55), color = "red") +
+                    geom_vline(aes(xintercept = bla$meanWD), color = "orange") + geom_text(aes(x = bla$meanWD + 1, label = paste("meanWD = ", bla$meanWD), y = 0.55), color = "orange") +
+                    geom_vline(aes(xintercept = bla$Index30), color = "yellow4") + geom_text(aes(x = bla$Index30 + 1, label = paste("Index30 = ", bla$Index30), y = 0.45), color = "yellow4")
+soilResults = ggarrange(WP1, WP2, fcplot, aetSens)
+
+pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "ResultsSoil.pdf"), width = 30, height = 16);
+print(soilResults);
+dev.off()
 
 gc(reset = TRUE)
 
 #----
 
-FCarray = seq(0.4, 0.4, length = 10);
+FCarray = seq(0.2, 0.8, length = 10);
 wiltingPointArray = seq(0.001, 0.1,length = 45);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
-AETArray = seq(from = 1, to = 5, length = 20);
+AETArray = seq(from = 0.1, to = 1, length = 10);
 RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
 initIonArray = seq(from = 1, to = 20, length = 45);
 AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 
-results = lapply(seq(FCarray), FUN = function(X) CalcGypsum(SynthRain, duration = 2000, DustCa = 0.5, DustSO4 = 0.5, RainFactor = 1, Depth = 100, Getresults = TRUE, FieldCapacity = X));
+results = lapply(FCarray, FUN = function(X) CalcGypsum(SynthRainEilat, duration = 1000, FieldCapacity = X));
 #list of retrun variables (fucking genius)
-results = results %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>% map(~melt(.x, id.vars = "rowid", measure.vars = "value"))
+results = results %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
+            map(~melt(.x, id.vars = "rowid", measure.vars = "value"))
 
-ggplot(results$leachate) + geom_path(aes(value))
-
-ggplot(k, aes(Depth, percentile)) + geom_path() + scale_x_reverse() + coord_flip()
+#aetsENSITIVITY
+ggplot(tibble(meanWD = results$meanWD$value, Index30 = results$Index30$value, WDp80 = results$WDp80$value, FC = FCarray)) +
+    geom_path(aes(FC, meanWD, color = "meanWD")) +
+    geom_path(aes(FC, Index30, color = "Index30")) +
+    geom_path(aes(FC, WDp80, color = "WDp80")) +
+    scale_y_reverse() + ylab("depth")
 
 
 ggplot(bla, aes(value, group = L1)) + stat_ecdf(aes(color = factor(L1))) + coord_flip(c(0,10)) + scale_x_reverse() + scale_y_reverse()

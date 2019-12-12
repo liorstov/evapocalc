@@ -3,7 +3,7 @@
 
 Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CSO4)
 {
-	this->nIndex = Index;
+	this->fDepth = (Index +0.5)*thick;
 	this->nThetaWeildingPnt = wieldingpoint;
 	this->nFieldCapacity = fieldcapacity;
 	this->nWhc = fieldcapacity;
@@ -16,6 +16,7 @@ Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldca
 	this->nLastMoist = 0;
 	this->nWetCount = 0;
 	this->fTotLeachate = 0;
+	this->fAETLoss = 0;
 }
 
 Compartment::~Compartment()
