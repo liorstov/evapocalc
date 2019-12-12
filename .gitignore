@@ -380,4 +380,8 @@ healthchecksdb
 *.txt
 *.Rhistory
 *.mat
+.Rhistory
+.Rapp.history
+
+# Session Data files
 .RData

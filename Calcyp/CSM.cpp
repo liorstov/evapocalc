@@ -64,11 +64,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 	int nRainEvents = 0;
 	// create list with all compartment
 	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create();
-	Rcpp::DoubleVector leach = Rcpp::DoubleVector::create();
+	Rcpp::DoubleVector CompWash = Rcpp::DoubleVector::create();
 	Rcpp::DoubleVector dayrain = DoubleVector::create();
-	Rcpp::DoubleVector dayAET = DoubleVector::create();
+	Rcpp::DoubleVector AETLoss = DoubleVector::create();
 	Rcpp::DoubleVector dayTotMoist = DoubleVector::create();
-	Rcpp::IntegerVector WD = Rcpp::IntegerVector::create();
+	Rcpp::DoubleVector WD = Rcpp::DoubleVector::create();
 
 	vect.erase(0, vect.length());
 	//main loop over days
@@ -86,12 +86,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		else {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
 			AET = (nTotalMoist / nTotalWhc)*nDailyPET;
 		}
+		AET *= AETFactor;
 		
-			
 		Months[nMonth].totalAET += AET;
 		
 		//AET = AET * 10;
-		nTotalMoist = 0;
 		nTotalAet += AET;
 		
 		nTotalRain += nDailyRain;
@@ -117,11 +116,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt) < AET)
 			{
 				AET = AET - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt));
+				Compartments[d].fAETLoss += Compartments[d].nMoist - Compartments[d].nThetaWeildingPnt;
 				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt;
 			}
 			else
 			{
 				Compartments[d].nMoist -= AET;
+				Compartments[d].fAETLoss += AET;
 				AET = 0.0;
 			}
 
@@ -178,7 +179,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		{
 			nRainEvents++;
 			Compartments[nDeepestCompt].nWetCount++;
-			WD.push_back(nDeepestCompt);
+
+			//WD is in the middle of the compartment
+			WD.push_back((nDeepestCompt+0.5)*nthick);
 		}
 		nDeepestCompt = 0;
 
@@ -189,7 +192,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
 		vect.push_back(it->nWetCount);
-		leach.push_back(it->fTotLeachate);
+		CompWash.push_back(it->fTotLeachate);
+		AETLoss.push_back(it->fAETLoss);
+		
 	}
 	
 	
@@ -204,10 +209,12 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 	results = Rcpp::List::create(_["gypsum"] = vect,	
 		_["WD"] = WD, 
 		_["moist"] = dayrain,
-		_["AET"] = dayAET,
+		_["AET"] = nTotalAet,
+		_["AETLoss"] = AETLoss,
 		_["totMoist"] = dayTotMoist,
 		_["totalRain"] = nTotalRain,
-		_["leachate"] = leach);
+		_["CompWash"] = CompWash,
+		_["Leachate"]= nTotalLeachate);
 
 	return results;
 }
