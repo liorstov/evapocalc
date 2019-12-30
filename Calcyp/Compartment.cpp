@@ -1,5 +1,5 @@
-#include "Compartment.h"
-
+﻿#include "Compartment.h"
+#include <iomanip>
 
 Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldcapacity, float thick , float CCa0, float CSO4)
 {
@@ -8,7 +8,7 @@ Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldca
 	this->nFieldCapacity = fieldcapacity;
 	this->nWhc = fieldcapacity;
 	this->nMoist = nThetaWeildingPnt;
-	this->nCCa = CCa0;
+	this->C_Ca = CCa0;
 	this->C_SO4 = CSO4;
 	this->C_CaSO4 = 0;
 	this->nthick = thick;
@@ -33,57 +33,59 @@ Compartment::~Compartment()
 // The calculation is following Marion et al. (1985) and Hirmas et al. (2010)
 float Compartment::solubility(float temp)
 {
-	float I, A, Ksp, ionActivity, MCa, MSo4, MCaSO4,a_Ca,a_So4,a_CaSo4, // a_* is activity = [Molar * ion activity]
+	double I, A, Ksp, ionActivity, MCa, MSo4, MCaSO4,a_Ca,a_So4,a_CaSo4, // a_* is activity = [Molar * ion activity]
 		GypOmega, alphaGypsum, a, b, c, limitation;
 	pair<float, float> Quadsolutions;
 
 	//convert to Molar
-	float MoistInLitre = this->nMoist * 0.01;
-	MCa = nCCa / MoistInLitre;
-	MSo4 = C_SO4 / MoistInLitre;
-	MCaSO4 = C_CaSO4 / MoistInLitre;
+	double MoistInLitre = this->nMoist * 0.001F;
+	MCa = C_Ca / MoistInLitre;//Molar
+	MSo4 = C_SO4 / MoistInLitre;//Molar
+	MCaSO4 = C_CaSO4 / MoistInLitre;//Molar
 
 	// Ionic strength
 	I = 0.5*(MCa * 4 + MSo4 * 4); // eq. 4. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
 	A = 0.4918 + (6.6098 * pow(10, -4) * temp) + (5.0231 * pow(10, -6) * pow(temp, 2));
-	ionActivity = pow(10, -A *  (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
-	Ksp = pow(10, -2.23 - (0.0019*temp)) * pow(ionActivity, 2);
+	ionActivity = pow(10, -A * sqrt(I) / (1 + sqrt(I)) - 0.3*I);
+	Ksp = pow(10, -4.58) * pow(ionActivity, 2);
 
 	//Eq.3 converting to activity
 	a_Ca = MCa * ionActivity;
 	a_So4 = MSo4 * ionActivity;
 	a_CaSo4 = MCaSO4 * ionActivity;
-	//// check if percipitating
-	//EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
-	//CurrentConcentrationProduct = ;
-
+	
 	// omega is the difference between current product and equil product
-	GypOmega = a_Ca * a_So4/Ksp;
-
-	// the concentration we need to add or substract to gypsum
-	alphaGypsum = 0;
+	//Ω > 1 - supersaturated solution, and Ω < 1 - undersaturated solution
+	GypOmega =  a_Ca * a_So4/Ksp;
+// the concentration we need to add or substract to gypsum
 	a = 1;
-	b = a_Ca + a_So4;
-	c = (a_Ca + a_So4) - Ksp;
+	b = -(a_Ca + a_So4);
+	c = (a_Ca * a_So4) - Ksp;
 	Quadsolutions = quadricEquation(a, b, c);
-	alphaGypsum = fmaxf(Quadsolutions.first, Quadsolutions.second);
-
+	GypOmega = (roundf(GypOmega * 10) / 10.0);	
+	//cout << GypOmega << endl;
 	// percipitation
-	if (GypOmega >= 1)
+	if (GypOmega > 1)
 	{
+		alphaGypsum = nonNegetiveX(Quadsolutions, a_Ca, a_So4);
 		limitation = fminf(a_Ca, a_So4);
-		if (limitation < -alphaGypsum)
+		if (limitation < alphaGypsum)
 		{
-			alphaGypsum = -limitation;
+			alphaGypsum = limitation;
 		}
+		alphaGypsum *= -1;
 	}
 	//dissolution
-	else
+	else if(GypOmega < 1)
 	{
+		alphaGypsum = nonNegetiveX(Quadsolutions, a_CaSo4);
 		if (MCaSO4 <= alphaGypsum)
 		{
 			alphaGypsum = MCaSO4;
 		}
+	}
+	else {
+		alphaGypsum = 0;
 	}
 
 	//Rcpp::Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;
@@ -92,10 +94,10 @@ float Compartment::solubility(float temp)
 	a_CaSo4 -= alphaGypsum;
 	
 	//convert to mol
-	nCCa = a_Ca / ionActivity * MoistInLitre;
+	C_Ca = a_Ca / ionActivity * MoistInLitre;
 	C_SO4 = a_So4 / ionActivity * MoistInLitre;
 	C_CaSO4 = a_CaSo4/ ionActivity * MoistInLitre;
-	//setAllToZero();
+	setAllToZero();
 
 	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
 
@@ -114,7 +116,7 @@ pair<float, float> Compartment::quadricEquation(float a, float b , float c)
 void Compartment::setAllToZero()
 {
 	{
-		if (nCCa < 0) nCCa = 0;
+		if (C_Ca < 0) C_Ca = 0;
 		if (C_SO4 < 0) C_SO4 = 0;
 		if (C_CaSO4 < 0) C_CaSO4 = 0;
 	}
@@ -122,5 +124,28 @@ void Compartment::setAllToZero()
 
 float Compartment::GetIOnsSum()
 {
-	return C_CaSO4 + C_SO4 + nCCa;
+	return C_CaSO4 + C_SO4 + C_Ca;
+}
+
+float Compartment::nonNegetiveX(pair<float, float>& sol, float Ca, float SO4)
+{
+	if ((sol.first <= Ca) && (sol.first <= SO4)) {
+		return(sol.first);
+	}
+	else {
+		return(sol.second);
+	}
+}
+
+float Compartment::nonNegetiveX(pair<float, float>& sol, float gyp)
+{
+	if (sol.first <= gyp) {
+		return(sol.first);
+	}
+	else if (sol.second < 0) {
+		return(gyp);
+	}
+	else {
+		return(sol.second);
+	}
 }

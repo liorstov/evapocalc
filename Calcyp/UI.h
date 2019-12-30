@@ -4,11 +4,11 @@
 class UI
 {
 public:
-	UI(CSM& _handler, Rain& _rain);
+	UI(CSM& _handler, WG& _rain);
 	~UI();
 
 	void Print();
 	CSM &Handler;
-	Rain &rainHandler;
+	WG &rainHandler;
 };
 

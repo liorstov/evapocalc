@@ -2,7 +2,6 @@
 #include <ctime>
 
 
-
 #define MM_Ca = 40.08
 #define MM_SO4 = 96.06
 #define MM_CaSO4 = 136.14;
@@ -32,7 +31,7 @@ CSM::CSM()
 }
 
 
-Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float years, float Depth, float nthick, float WieltingPoint, float InitialCa,
+vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years, float Depth, float nthick, float WieltingPoint, float InitialCa,
  float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
 {
 	nNumOfDays = years*365;
@@ -40,23 +39,24 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 	thick = nthick;	
 	nArea = FieldArea;
 	nNumOfCompatments = nDepth / thick;
-	wieltingPoint = WieltingPoint*thick ;
-	CCa =meq2mmol(InitialCa, nthick*nArea); // mmol
-	CSO4 = meq2mmol(initialSO4, nthick*nArea); // mmol
+	wieltingPoint = WieltingPoint*thick ;//in cm
 	BulkDensity =nBulkDensity; /// gr/cm^3
 	nFieldCapacity = FieldCapacity*thick;
 	RainArr = rain;
 	// carbonate in dust range from 0.5 to 5 [g m-2 yr-1]. 
 	//I took 0.51 [g m-2 yr-1] = 5.1*10^-5 [g cm-2 yr-1] = 1.4*10^-7 [g cm-2 day-1]
-	// then convert to [mmol cm-2 day-1] 
-	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 25.0F;
-	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 10.0F;
+	// then convert to [mol cm-2 day-1] 
+	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 0.02495F; //calcium molar waight 0.02495
+	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 0.0104F; //so4 molar waight 0.0104
 
-	nTotalWhc = (nFieldCapacity - wieltingPoint) * nNumOfCompatments;
-	nTotalMoist = wieltingPoint * nNumOfCompatments;
+	nTotalWhc = (nFieldCapacity - wieltingPoint) * nNumOfCompatments;//in cm
+	nTotalMoist = wieltingPoint * nNumOfCompatments;//[cm]
 	nInitMoistTotal = nTotalMoist;
 	InitCompartments();
 	InitMonths();
+
+	CCa =meqSoil2molar(InitialCa, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
+	CSO4 = meqSoil2molar(initialSO4, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
 	
 	int nMonth;
 	float nTemp;
@@ -65,19 +65,19 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 	float nDailyRain;
 	int nWDComp = 0;
 	int nRainEvents = 0;
-	int nRainVecLength = RainArr.length();
+	int nRainVecLength = RainArr.size();
 	
 	// create list with all compartment
-	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create(); 
-	Rcpp::DoubleVector Gypsum = Rcpp::DoubleVector::create(); 
-	Rcpp::DoubleVector CompWash = Rcpp::DoubleVector::create();
-	Rcpp::DoubleVector floodComp = DoubleVector::create();
-	Rcpp::DoubleVector AETLoss = DoubleVector::create();
-	Rcpp::DoubleVector dayRain = DoubleVector::create();
-	Rcpp::DoubleVector WD = DoubleVector::create();
-	vect.erase(0, vect.length());
+	vector<float> vect;
+	vector<float> Gypsum;
+	vector<float> CompWash;
+	vector<float> floodComp;
+	vector<float> AETLoss;
+	vector<float> dayRain;
+	vector<float> WD;
+	//vect.erase(0, vect.length());
 
-	nNumOfDays = min(nNumOfDays, nRainVecLength);
+	nNumOfDays =   std::min(nNumOfDays, nRainVecLength);
 
 	//main loop over days
 	for (int day = 0; ((day < nNumOfDays)); day++)
@@ -108,7 +108,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 
 		//accumolate dust and relaese when its raining 
 		if (nDailyRain > 0) {
-			Compartments[0].nCCa += accumolateDustDays * nDailyDustCa;
+			Compartments[0].C_Ca += accumolateDustDays * nDailyDustCa;
 			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4;
 			accumolateDustDays = 0;
 		}
@@ -174,18 +174,19 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 				//wash to next compartment or to leachete
 				// ion are in mol
 				if (d != nNumOfCompatments - 1) {
-					Compartments[d + 1].nCCa += Compartments[d].nCCa;
+					Compartments[d + 1].C_Ca += Compartments[d].C_Ca;
 					Compartments[d + 1].C_SO4 += Compartments[d].C_SO4;
 					Compartments[d + 1].nMoist += nLeachate;
 				}
 				else
 				{
-					nTotalCaLeachate += Compartments[d].nCCa;
+					nTotalCaLeachate += Compartments[d].C_Ca;
 					nTotalSO4Leachate += Compartments[d].C_SO4;
 					nTotalLeachate += nLeachate;
+					nWDComp = d;
 				}
 
-				Compartments[d].nCCa = 0;
+				Compartments[d].C_Ca = 0;
 				Compartments[d].C_SO4 = 0;
 				nLeachate = 0;
 			}		
@@ -197,7 +198,6 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 			//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
 			WD.push_back(it->nMoist);
-			Gypsum.push_back(it->C_CaSO4);
 
 		}
 
@@ -224,7 +224,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		vect.push_back(it->nWetCount);
 		CompWash.push_back(it->fTotLeachate);
 		AETLoss.push_back(it->fAETLoss); 
-		floodComp.push_back(it->nFloodedCount);
+		floodComp.push_back(it->nFloodedCount);		
+		Gypsum.push_back(molar2meqSoil(it->C_CaSO4, 5, moistcm2Litre(it->nMoist)));
+
 	}
 	
 	
@@ -234,7 +236,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		"total AET: " << nTotalAet << endl <<
 		"balance: " << nTotalRain - nLeachate - nTotalMoist - nInitMoistTotal - nTotalAet << endl <<
 		"rain events: " << nRainEvents <<  endl;*/
-	Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
+	/*Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
 	NumericMatrix GypsumMat = transpose(as<NumericMatrix>(Gypsum));
 
 	WD.attr("dim") = Dimension(5, WD.length() / (5));
@@ -248,9 +250,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		_["GypsumDay"] = GypsumMat,
 		_["totalRain"] = nTotalRain,
 		_["CompWash"] = CompWash,
-		_["Leachate"]= nTotalLeachate);
+		_["Leachate"]= nTotalLeachate);*/
 
-	return results;
+	return Gypsum;
 }
 
 std::vector<Compartment>* CSM::GetCompartments()
@@ -260,17 +262,21 @@ std::vector<Compartment>* CSM::GetCompartments()
 
 
 
-//input meq/100g return mmol/cm3
-float CSM::meq2mmol(float fMeq, float SoilVolume)
+//input meq/100g return mol/Litre
+float CSM::meqSoil2molar(float fMeq, float SoilVolume, float moisture)
 {
-	//fmeq is meq/100g soil . multiply by bukl denisty[g/cm3] mult by 0.5[mmol/meq]
-	return(fMeq * 1.44 * 0.01 *0.5 * SoilVolume);
+	//fmeq is meq/100g soil . multiply by bukl denisty[g/cm3] divide by 100[gr soil ] mult by soilVolume [cm3] mult by 0.5[mmol/meq] mult by 0.001 [mol/mmol] divide by moisture
+	return(fMeq * 1.44* SoilVolume/100  *0.5* 0.001 / moisture );
 }
 
-//input mmol/cm3 return meq/100g soil
-float CSM::mmol2meq(float mmol, float SoilVolume)
+//input mol/Litre mult by moisture [litre] mult by 0.002 [meq/mol] divide by volume return meq/100g soil
+float CSM::molar2meqSoil(float molar, float SoilVolume, float moisture)
 {
-	return ((mmol * 2 /(SoilVolume*1.44))*  100  );
+	return ((molar * moisture * 0.002 /(SoilVolume*1.44))*  100  );
+}
+
+float CSM::moistcm2Litre(float moist_cm) {
+	return(moist_cm*0.001F);
 }
 
  
@@ -287,10 +293,10 @@ float CSM::GetPrecision(float x)
 	return(((int)(x*10000.0)) / 10000.0F);
 }
 
-Rcpp::List CSM::GetResults()
-{
-	return results;
-}
+//Rcpp::List CSM::GetResults()
+//{
+//	return results;
+//}
 
 void CSM::InitCompartments()
 {
@@ -402,17 +408,17 @@ float CSM::JULIAN(int day)
 }
 
 // [[Rcpp::plugins(cpp11)]]
-RCPP_MODULE(CSM_MODULE) {
-	using namespace Rcpp;
-	class_<CSM>("CSMCLASS")
-	.constructor()
-
-	.method("Calculate", &CSM::Calculate,
-		"Docstring for stats")
-		
-
-	.method("InitMonths", &CSM::InitMonths, "desc")
-	.method("GetResults", &CSM::GetResults, "GetResults")
-	.field("RainArr", &CSM::RainArr, "rain array")
-	;
-}
+//RCPP_MODULE(CSM_MODULE) {
+//	using namespace Rcpp;
+//	class_<CSM>("CSMCLASS")
+//	.constructor()
+//
+//	.method("Calculate", &CSM::Calculate,
+//		"Docstring for stats")
+//		
+//
+//	.method("InitMonths", &CSM::InitMonths, "desc")
+//	.method("GetResults", &CSM::GetResults, "GetResults")
+//	.field("RainArr", &CSM::RainArr, "rain array")
+//	;
+//}

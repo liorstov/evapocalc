@@ -3,14 +3,15 @@
 
 using namespace std;
 
-class Rain
+class WG
 {
 public:
-	Rain(bool bCreateRain);
+	WG();
 
-	~Rain();
+	~WG();
 
-	float* rain;
+	vector<float> rain;
+	vector<float> PET;
 	float totalrain;
 
 private:

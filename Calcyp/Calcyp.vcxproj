@@ -75,7 +75,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <DisableSpecificWarnings>4244</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>C:\Users\liorst\Documents\R\win-library\3.6\Rcpp\include\Rcpp;C:\Program Files\R\R-3.6.1\include;C:\Users\liorst\Documents\R\win-library\3.6\Rcpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>Debug</GenerateDebugInformation>

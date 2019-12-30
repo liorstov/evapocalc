@@ -2,7 +2,8 @@
 #include "math.h"
 #include <stdio.h>
 #include <map>
-#include <Rcpp.h>
+#include <iostream>
+//#include <Rcpp.h>
 
 
 using namespace std;
@@ -17,6 +18,8 @@ public:
 	pair<float, float> quadricEquation(float, float, float);
 	void setAllToZero();
 	float GetIOnsSum();
+	float nonNegetiveX(pair<float, float>&, float, float);
+	float nonNegetiveX( pair<float, float>&, float);
 
 	float fDepth;
 	int nthick;
@@ -26,7 +29,7 @@ public:
 	float nWhc;					//water holding capacity
 	float nInitTotMoist;
 	float nMoist;				// moisture level
-	float nCCa;					//soluble Ca ion [mmol]
+	float C_Ca;					//soluble Ca ion [mmol]
 	float C_SO4;				//solunle so4 anion [mmol]
 	float C_CaSO4;				//solid gypsum in mmol
 	float nLastMoist;

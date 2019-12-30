@@ -6,17 +6,16 @@ int main()
 {
 
 	float temp[12] = { 10.2,11.8,14.3,18.1,22.6,27.8,30.0,28.9,26.7,20.8,14.6,10.8 };
-	Rain Rainclass(false);
+	WG rainPET;
 	
-
+	
 	
 	CSM * Calc = new CSM();
 	
-	Calc->Calculate(Rainclass.rain, 1, 50, 5, 0.039, 10, 10, 1.44, 1, 0.2, 0, 0, );
-	UI ui(*Calc, Rainclass);
-	ui.Print();
+	vector<float> res = Calc->Calculate(rainPET.rain, rainPET.PET, 900, 100, 5, 0.02, 0, 0, 1.44, 1, 0.19, 1.5, 1.5,0.6 );
 
-	//system("pause");
+	delete(Calc);
+	system("pause");
 	
 
 }

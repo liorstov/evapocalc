@@ -3,7 +3,7 @@
 #include <fstream>
 #include <stdio.h>
 
-UI::UI(CSM& _handler, Rain& _rain) : Handler(_handler), rainHandler(_rain)
+UI::UI(CSM& _handler, WG& _rain) : Handler(_handler), rainHandler(_rain)
 {
 	//Handler = _handler;
 }
