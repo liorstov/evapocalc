@@ -1,10 +1,10 @@
 #pragma once
 #include "math.h"
 #include <stdio.h>
+#include <map>
 #include <Rcpp.h>
 
 
-using namespace Rcpp;
 using namespace std;
 class Compartment
 {
@@ -38,6 +38,7 @@ public:
 	int nWetCount;
 	float fTotLeachate;
 	float fAETLoss;
+	int nFloodedCount;
 
 };
 

@@ -7,14 +7,33 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Calcyp", "Calcyp\Calcyp.vcx
 EndProject
 Project("{DA7A21FA-8162-4350-AD77-A8D1B671F3ED}") = "evapostats", "evapostats\evapostats.rxproj", "{5703C0AC-1B2B-4374-958D-7551FB8E4304}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "evapostats", "evapostats", "{0362BA03-5795-4468-970C-F78619BC9B69}"
+	ProjectSection(SolutionItems) = preProject
+		evapostats\Functions.R = evapostats\Functions.R
+		evapostats\GypsoilHorizons.R = evapostats\GypsoilHorizons.R
+		evapostats\MetaScript.R = evapostats\MetaScript.R
+		evapostats\PETGen.R = evapostats\PETGen.R
+		evapostats\RainGen.R = evapostats\RainGen.R
+		evapostats\Script1.R = evapostats\Script1.R
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		NoRCpp|Any CPU = NoRCpp|Any CPU
+		NoRCpp|x64 = NoRCpp|x64
+		NoRCpp|x86 = NoRCpp|x86
 		RCpp|Any CPU = RCpp|Any CPU
 		RCpp|x64 = RCpp|x64
 		RCpp|x86 = RCpp|x86
+		RCpp1|Any CPU = RCpp1|Any CPU
+		RCpp1|x64 = RCpp1|x64
+		RCpp1|x86 = RCpp1|x86
+		RCppo|Any CPU = RCppo|Any CPU
+		RCppo|x64 = RCppo|x64
+		RCppo|x86 = RCppo|x86
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
@@ -25,12 +44,30 @@ Global
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Debug|x64.Build.0 = Debug|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Debug|x86.ActiveCfg = Debug|Win32
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Debug|x86.Build.0 = Debug|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|Any CPU.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|Any CPU.Build.0 = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|x64.ActiveCfg = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|x64.Build.0 = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|x86.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.NoRCpp|x86.Build.0 = Release|Win32
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|Any CPU.ActiveCfg = Release|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|Any CPU.Build.0 = Release|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|x64.ActiveCfg = Release|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|x64.Build.0 = Release|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|x86.ActiveCfg = Release|Win32
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp|x86.Build.0 = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|Any CPU.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|Any CPU.Build.0 = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|x64.ActiveCfg = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|x64.Build.0 = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|x86.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCpp1|x86.Build.0 = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|Any CPU.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|Any CPU.Build.0 = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|x64.ActiveCfg = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|x64.Build.0 = Release|x64
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|x86.ActiveCfg = Release|Win32
+		{B96F1631-1AA7-4C14-8682-0A9169884744}.RCppo|x86.Build.0 = Release|Win32
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Release|Any CPU.ActiveCfg = Debug|Win32
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Release|x64.ActiveCfg = Debug|x64
 		{B96F1631-1AA7-4C14-8682-0A9169884744}.Release|x64.Build.0 = Debug|x64
@@ -42,12 +79,30 @@ Global
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Debug|x64.Build.0 = Debug|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Debug|x86.ActiveCfg = Debug|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Debug|x86.Build.0 = Debug|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|Any CPU.ActiveCfg = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|Any CPU.Build.0 = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|x64.ActiveCfg = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|x64.Build.0 = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|x86.ActiveCfg = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.NoRCpp|x86.Build.0 = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|Any CPU.ActiveCfg = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|Any CPU.Build.0 = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|x64.ActiveCfg = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|x64.Build.0 = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|x86.ActiveCfg = NoRCpp|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp|x86.Build.0 = NoRCpp|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|Any CPU.ActiveCfg = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|Any CPU.Build.0 = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|x64.ActiveCfg = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|x64.Build.0 = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|x86.ActiveCfg = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCpp1|x86.Build.0 = RCpp1|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|Any CPU.ActiveCfg = RCppo|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|Any CPU.Build.0 = RCppo|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|x64.ActiveCfg = RCppo|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|x64.Build.0 = RCppo|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|x86.ActiveCfg = RCppo|Any CPU
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.RCppo|x86.Build.0 = RCppo|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Release|Any CPU.ActiveCfg = Debug|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Release|Any CPU.Build.0 = Debug|Any CPU
 		{5703C0AC-1B2B-4374-958D-7551FB8E4304}.Release|x64.ActiveCfg = Debug|Any CPU
@@ -57,6 +112,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5703C0AC-1B2B-4374-958D-7551FB8E4304} = {0362BA03-5795-4468-970C-F78619BC9B69}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9EB1EBD3-E974-43D3-98CA-BAEE711A766D}

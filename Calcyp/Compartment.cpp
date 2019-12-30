@@ -17,6 +17,7 @@ Compartment::Compartment(int Index, int area, float wieldingpoint, float fieldca
 	this->nWetCount = 0;
 	this->fTotLeachate = 0;
 	this->fAETLoss = 0;
+	this->nFloodedCount = 0;
 }
 
 Compartment::~Compartment()
@@ -32,41 +33,45 @@ Compartment::~Compartment()
 // The calculation is following Marion et al. (1985) and Hirmas et al. (2010)
 float Compartment::solubility(float temp)
 {
-	float I, A, k6, ionActivity, EquilConcentrationConstant, MCa, MSo4, MCaSO4,
-		CurrentConcentrationProduct, GypOmega, alphaGypsum, a, b, c, limitation;
+	float I, A, Ksp, ionActivity, MCa, MSo4, MCaSO4,a_Ca,a_So4,a_CaSo4, // a_* is activity = [Molar * ion activity]
+		GypOmega, alphaGypsum, a, b, c, limitation;
 	pair<float, float> Quadsolutions;
 
 	//convert to Molar
 	float MoistInLitre = this->nMoist * 0.01;
-	MCa = nCCa / MoistInLitre / 1000;
-	MSo4 = C_SO4 / MoistInLitre / 1000;
-	MCaSO4 = C_CaSO4 / MoistInLitre / 1000;
-	k6 = pow(10, -2.23 - (0.0019*temp));
+	MCa = nCCa / MoistInLitre;
+	MSo4 = C_SO4 / MoistInLitre;
+	MCaSO4 = C_CaSO4 / MoistInLitre;
 
 	// Ionic strength
-	I = 0.5*(MCa * 4 + MSo4 * 4); // eq. 14. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
+	I = 0.5*(MCa * 4 + MSo4 * 4); // eq. 4. as cca is in [M] or [mol/L], I is also in [M] or [mol/L] 
 	A = 0.4918 + (6.6098 * pow(10, -4) * temp) + (5.0231 * pow(10, -6) * pow(temp, 2));
-	ionActivity = pow(10, -A * 4 * (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
+	ionActivity = pow(10, -A *  (sqrt(I) / (1 + sqrt(I)) - (0.3*I)));
+	Ksp = pow(10, -2.23 - (0.0019*temp)) * pow(ionActivity, 2);
 
-	// check if percipitating
-	EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
-	CurrentConcentrationProduct = MCa * MSo4;
+	//Eq.3 converting to activity
+	a_Ca = MCa * ionActivity;
+	a_So4 = MSo4 * ionActivity;
+	a_CaSo4 = MCaSO4 * ionActivity;
+	//// check if percipitating
+	//EquilConcentrationConstant = k6 / (pow(ionActivity, 2));
+	//CurrentConcentrationProduct = ;
 
 	// omega is the difference between current product and equil product
-	GypOmega = CurrentConcentrationProduct - EquilConcentrationConstant;
+	GypOmega = a_Ca * a_So4/Ksp;
 
 	// the concentration we need to add or substract to gypsum
 	alphaGypsum = 0;
 	a = 1;
-	b = (MCa + MSo4);
-	c = GypOmega;
+	b = a_Ca + a_So4;
+	c = (a_Ca + a_So4) - Ksp;
 	Quadsolutions = quadricEquation(a, b, c);
 	alphaGypsum = fmaxf(Quadsolutions.first, Quadsolutions.second);
 
 	// percipitation
-	if (GypOmega >= 0)
+	if (GypOmega >= 1)
 	{
-		limitation = fminf(MCa, MSo4);
+		limitation = fminf(a_Ca, a_So4);
 		if (limitation < -alphaGypsum)
 		{
 			alphaGypsum = -limitation;
@@ -81,16 +86,16 @@ float Compartment::solubility(float temp)
 		}
 	}
 
-	//Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;
-	MCa += alphaGypsum;
-	MSo4 += alphaGypsum;
-	MCaSO4 -= alphaGypsum;
+	//Rcpp::Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;
+	a_Ca += alphaGypsum;
+	a_Ca += alphaGypsum;
+	a_CaSo4 -= alphaGypsum;
 	
-	//convert to mmol
-	nCCa = MCa * MoistInLitre*1000;
-	C_SO4 = MSo4 * MoistInLitre*1000;
-	C_CaSO4 = MCaSO4 * MoistInLitre*1000;
-	setAllToZero();
+	//convert to mol
+	nCCa = a_Ca / ionActivity * MoistInLitre;
+	C_SO4 = a_So4 / ionActivity * MoistInLitre;
+	C_CaSO4 = a_CaSo4/ ionActivity * MoistInLitre;
+	//setAllToZero();
 
 	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
 
