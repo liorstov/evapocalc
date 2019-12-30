@@ -276,59 +276,67 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
 
         #--
         #PET density----
-        plotLimit = 15;
+        plotLimit = ceiling(max(SynthRain$PET));
         histBreaksSize = 0.1;
 
         #histogram for observed
-        DailyPET = IMSRain %>% filter(!is.na(pen)) %>%  pull(pen) %>%
-                                                        hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(observed = density)
+        DailyPET = IMSRain %>% filter(!is.na(pen)) %>% pull(pen) %>%
+                                                        hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(DailyPET = density)
 
+        DailyPETWet = IMSRain %>% filter(!is.na(pen)) %>% addKvalue() %>% filter(K == 1) %>% pull(pen) %>%
+                                                        hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(DailyPETWet = density)
+
+        DailyPETDAW = IMSRain %>% filter(!is.na(pen)) %>% addKvalue() %>% filter(K == 2) %>% pull(pen) %>%
+                                                        hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(DailyPETDAW = density)
+
+        DailyPETDAD = IMSRain %>% filter(!is.na(pen)) %>% addKvalue() %>% filter(K == 3) %>% pull(pen) %>%
+                                                                hist(breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>% Hist2tibble() %>% rename(DailyPETDAD = density)
+        
         #histogram for simulated
         SimPet = SynthRain %>% group_by(PETSeries) %>%
                        summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
                              map(~Hist2tibble(.x)) %>% reduce(bind_rows)
 
         #deivide to summer and winter
-        simPetWinter = SynthRain %>% filter(dayIndex <= 365 / 2) %>%
-                       summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
-                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
-                        summarise(simulatedWin = mean(density), minWin = quantile(density, 0.05), medianWin = quantile(density, 0.5), maxWin = quantile(density, 0.95))
+        #simPetWinter = SynthRain %>% filter(dayIndex <= 365 / 2) %>%
+                       #summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             #map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                        #summarise(simulatedWin = mean(density), minWin = quantile(density, 0.05), medianWin = quantile(density, 0.5), maxWin = quantile(density, 0.95))
 
-        simPetSummer = SynthRain %>% filter(dayIndex > 365 / 2) %>% 
-                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
-                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
-                            summarise(simulatedSum = mean(density), minSum = quantile(density, 0.05), medianSum = quantile(density, 0.5), maxSum = quantile(density, 0.95))
+        #simPetSummer = SynthRain %>% filter(dayIndex > 365 / 2) %>% 
+                         #summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             #map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            #summarise(simulatedSum = mean(density), minSum = quantile(density, 0.05), medianSum = quantile(density, 0.5), maxSum = quantile(density, 0.95))
 
-        simPetDAW = SynthRain %>% filter(K == 2) %>% 
-                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
-                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
-                            summarise(simulatedDAW = mean(density), minDAW = quantile(density, 0.05), medianDAW = quantile(density, 0.5), maxDAW = quantile(density, 0.95))
+        #simPetDAW = SynthRain %>% filter(K == 2) %>% 
+                         #summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             #map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            #summarise(simulatedDAW = mean(density), minDAW = quantile(density, 0.05), medianDAW = quantile(density, 0.5), maxDAW = quantile(density, 0.95))
 
-        rainOnly = SynthRain %>% filter(rain > 0) %>%
-                         summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
-                             map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
-                            summarise(simulatedRain = mean(density), minRain = quantile(density, 0.05), medianRain = quantile(density, 0.5), maxRain = quantile(density, 0.95))
+        #rainOnly = SynthRain %>% filter(rain > 0) %>%
+                         #summarise(a = list(hist(PET, breaks = seq(0, plotLimit, histBreaksSize), plot = 0)), n = n()) %>% pull(a) %>%
+                             #map(~Hist2tibble(.x)) %>% reduce(bind_rows) %>% group_by(breaks) %>%
+                            #summarise(simulatedRain = mean(density), minRain = quantile(density, 0.05), medianRain = quantile(density, 0.5), maxRain = quantile(density, 0.95))
 
         print("80%")
 
       
         #aggregating 
         SimPetDensity = SimPet %>% group_by(breaks) %>% summarise(simulated = mean(density), min = quantile(density, 0.05), median = quantile(density, 0.5), max = quantile(density, 0.95)) %>%
-                left_join(DailyPET, by = "breaks") %>% left_join(simPetWinter, by = "breaks") %>% left_join(simPetSummer, by = "breaks") %>% left_join(rainOnly, by = "breaks") %>% left_join(simPetDAW, by = "breaks")
+                left_join(DailyPET, by = "breaks") %>% left_join(DailyPETWet, by = "breaks") %>% left_join(DailyPETDAD, by = "breaks") %>% left_join(DailyPETDAW, by = "breaks") 
 
         p5 = ggplot(SimPetDensity, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
-                                geom_line(aes(y = observed, color = "Measured")) +
+                                geom_line(aes(y = DailyPET, color = "Measured")) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
                                 xlab("PET [mm / day]") +
                                 scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
 
         PETProbabilities = ggplot(SimPetDensity, aes(x = breaks)) + geom_line(aes(y = simulated, color = "Simulated"), size = 1.5) + ylab("pdf") +
-                                geom_line(aes(y = observed, color = "Measured")) +
+                                geom_line(aes(y = DailyPET, color = "Measured")) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
-                                geom_line(aes(y = simulatedWin, color = "Simulated Winter")) +
-                                geom_line(aes(y = simulatedSum, color = "Simulated summer")) +
-                                geom_line(aes(y = simulatedRain, color = "Simulated Wet Days")) +
-                                geom_line(aes(y = simulatedDAW, color = "Simulated DAW")) +
+                                geom_line(aes(y = DailyPETWet, color = "Measured wet")) +
+                                geom_line(aes(y = DailyPETDAD, color = "Measured DAD")) +
+                                geom_line(aes(y = DailyPETDAW, color = "Measured DAW")) +
                                 xlab("PET [mm / day]") +
                                 scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
 

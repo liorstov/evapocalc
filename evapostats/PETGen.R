@@ -43,54 +43,59 @@ PETPerDay <- function(monthodDay, Kday,random, K.month.table) {
 }
 
 
+#add k values
+#wet = 1, DAW = 2, DAD = 3
+addKvalue <- function(IMSTable) {
+    #Add column for previous day 
+    IMSTable$prevDayRain = lag(IMSTable$rain, default = 0);
 
+    #add column for previous day Pen
+    IMSTable$PenLag = lag(IMSTable$pen, default = 0);
 
+    #k is the type of the day: 1:DAD,2:W,3:DAW,4:WAW
+    IMSTable$K = apply(IMSTable[, c("rain", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
+    IMSTable = IMSTable %>% dplyr::select(-PenLag);
+    return(IMSTable);
+}
 
 #main function. parameter is a synthetic rain series and measured rain series
-PETGen <- function(SynthRain, IMSRain, windowSize = 40, windowSize2 = NULL)
+PETGen <- function(SynthRain, IMSRain, windowSize = 30, windowSize2 = NULL)
  {
     tic()
     print("calc PET")   
-    IMSPenOnly = IMSRain %>% filter(!is.na(pen))
-    #Add column for previous day 
-    IMSPenOnly$prevDayRain = lag(IMSPenOnly$rain, default = 0);
 
-    #add column for previous day Pen
-    IMSPenOnly$PenLag = lag(IMSPenOnly$pen, default = 0);    
+   #add k values
+    IMSPenOnly = IMSRain %>% filter(!is.na(pen)) %>% arrange(time) %>% addKvalue();
 
-    #k is the type of the day: 1:DAD,2:W,3:DAW,4:WAW
-    IMSPenOnly$K = apply(IMSPenOnly[, c("rain", "prevDayRain")], 1, FUN = function(X) GetKforDay(X[1], X[2]));
-
-    #Prepare grouping by day and K
-
-    #calculate statistics for each group
-    #This table will supply the reference of penman evaporation for a specific K and month
-    K.month.table = IMSPenOnly %>% group_by(K, dayIndex) %>% dplyr::summarise(
-                                                             numElements = n(),
-                                                                 mean = mean(pen),
-                                                                 std = sd(pen)                                                                
-                                                                ) %>% mutate(std = replace_na(std,0))
-    #adding full days represenation
-    K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>% left_join(K.month.table, by = c("dayIndex", "K"))
-
-    #filling NA days with selected mean values
-    #mean.per.day = K.month.table %>% group_by(dayIndex) %>% summarise(meanDay = min(mean, na.rm = 1))
-    #K.month.table$mean = apply(K.month.table, 1, FUN = function(X) { replace_na(X[4], mean.per.day$meanDay[X[2]]) })
-
-    ##remove NA std
-    #K.month.table$std[is.na(K.month.table$std)] = 0;
-
-    
-    K.month.table = K.month.table %>% group_by(K) %>% mutate(smoothMean = MovingAvarage(mean, windowSize, windowSize2), smoothSTD = MovingAvarage(std, windowSize, windowSize2))
+    #representing every day
+    #then pasting 2d moving avarage for every 30 days
+    K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>%
+                    mutate(smoothMean = map2_dbl(K, dayIndex, ~ smoothMean(.x, .y, IMSPenOnly, windowSize)), smoothSTD = map2_dbl(K, dayIndex, ~ smoothStd(.x, .y, IMSPenOnly, windowSize))) %>%
+                    mutate(smoothMean = replace_na(smoothMean, 0), smoothSTD = replace_na(smoothSTD,0))
    
-
-    #calculate the gamma correction for the category
-   # K.month.table$Corection = apply(K.month.table[, c("skew", "rPen")], 1, FUN = function(X) GammaCorrection(X[1], X[2]));
     PET.rainfall.series = SynteticPetGen(K.month.table, SynthRain)
     toc() 
     return(list(SynthPET = PET.rainfall.series$PET,K = PET.rainfall.series$K, PETProb = K.month.table));
 }
 
+smoothMean = function(Kval,day, table, WS) {
+    return(table %>% filter(K == Kval, dayIndex %in% cyclicSeq(day, WS)) %>% summarise(penT = mean(pen, na.rm = TRUE)) %>% pull(penT))
+}
+smoothStd = function(Kval, day, table,WS) {
+    return(table %>% filter(K == Kval, dayIndex %in% cyclicSeq(day, WS)) %>% summarise(penSTD = sd(pen, na.rm = TRUE)) %>% pull(penSTD))
+}
+cyclicSeq = function(num, size) {
+    size = size / 2;
+    k_from = max(mod(num - size, 365), 1);
+    k_to = max(mod(num + size, 365), 1);
+    if (k_from < k_to) {
+        ks = k_from:k_to
+    }
+    else
+    { ks = c(k_from:365, 1:k_to) }
+    return(ks)
+    
+}
 #set PET accoring to category
 SynteticPetGen <- function(K.month.table, SynthRain) {
     
