@@ -85,7 +85,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		nMonth = ((day % 365) / 31);
 		nTemp = 25;
 		nDailyPET = PET[day]/10; 
-		nDailyRain = RainArr[day];
+		nDailyRain = RainArr[day]/10;
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
@@ -196,8 +196,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		
 		for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 			//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
-			WD.push_back(it->nMoist);
-			Gypsum.push_back(it->C_CaSO4);
+		//	WD.push_back(it->nMoist);
+			//Gypsum.push_back(it->C_CaSO4);
 
 		}
 
@@ -234,8 +234,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		"total AET: " << nTotalAet << endl <<
 		"balance: " << nTotalRain - nLeachate - nTotalMoist - nInitMoistTotal - nTotalAet << endl <<
 		"rain events: " << nRainEvents <<  endl;*/
-	Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
-	NumericMatrix GypsumMat = transpose(as<NumericMatrix>(Gypsum));
+	/*Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
+	NumericMatrix GypsumMat = transpose(as<NumericMatrix>(Gypsum));*/
 
 	WD.attr("dim") = Dimension(5, WD.length() / (5));
 	NumericMatrix WDMat = transpose(as<NumericMatrix>(WD));
@@ -245,7 +245,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, float
 		_["WetZone"] = floodComp,
 		_["AET"] = nTotalAet,
 		_["AETLoss"] = AETLoss,
-		_["GypsumDay"] = GypsumMat,
+		//_["GypsumDay"] = GypsumMat,
 		_["totalRain"] = nTotalRain,
 		_["CompWash"] = CompWash,
 		_["Leachate"]= nTotalLeachate);
@@ -294,6 +294,9 @@ Rcpp::List CSM::GetResults()
 
 void CSM::InitCompartments()
 {
+	if (Compartments.size() > 0) {
+		Compartments.clear();
+	}
 	Compartment *newCompartment;
 	for (int i = 0; i < nNumOfCompatments; i++)
 	{

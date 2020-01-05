@@ -25,7 +25,7 @@ source("evapostats/RainGen.R");
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
+IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
 rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
 PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
 
@@ -46,11 +46,11 @@ Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose
 
 
 
-duration = 4
+duration = 1000
 
 
 #soil
-res = CalcGypsum(SynthRain, duration, plotRes = 0, Depth = 100, AETFactor = 0.6);
+res = CalcGypsum(SynthRain, duration, plotRes = 1, Depth = 100, AETFactor = 0.6, FieldCapacity = 0.19, wieltingPoint = 0.02);
 
 #Test real rain
 IMSRain$year = IMSRain$waterYear %% IMSRain$waterYear[1] + 1

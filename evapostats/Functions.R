@@ -64,7 +64,7 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
 }
 
 comp2Depth = function(comp, thick = 5) {
-    return((comp+0.5)*thick)
+    return((comp-1+0.5)*thick)
 }
 plotSoilResults = function(res) {
     resLeach = tibble(leachate = res$CompWash, wetZone = res$WetZone / duration) %>% rowid_to_column %>% mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * 5)
@@ -74,8 +74,8 @@ plotSoilResults = function(res) {
                                geom_vline(aes(xintercept = res$WDp80, color = paste("WDp80 =", res$WDp80))) +
                                geom_vline(aes(xintercept = res$meanWD, color = paste("meanWD = ", res$meanWD))) +
                                geom_vline(aes(xintercept = res$Index30, color = paste("Index30 = ", res$Index30))) +
+                                geom_vline(aes(xintercept = res$SMeanWD, color = paste("MeanSWD = ", res$SMeanWD))) +
                                 geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03)))+
-                                geom_vline(aes(xintercept = res$SMeanWD, color = paste("SMeanWD = ", res$SMeanWD)))+
                                 geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)))
 
     percent = tibble(Depth = quantile(res$WD[,2], seq(0, 1, 0.1)), WDpercentile = seq(0, 1, 0.1))
