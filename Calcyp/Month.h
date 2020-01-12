@@ -4,16 +4,16 @@ typedef enum { Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec } MONT
 class Month
 {
 public:
-	Month(int _Number, float _temp, float _PanDaily, float _PETdaily, float _PET, float _pan);
+	Month(int _Number, double _temp, double _PanDaily, double _PETdaily, double _PET, double _pan);
 	~Month();
 
 	MONTH nNumber;
-	float nTemp;
-	float PanDaily;
-	float PETdaily;
-	float PET;
-	float pan;	
-	float totalAET;
+	double nTemp;
+	double PanDaily;
+	double PETdaily;
+	double PET;
+	double pan;	
+	double totalAET;
 
 };
 

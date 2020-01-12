@@ -31,8 +31,8 @@ CSM::CSM()
 }
 
 
-vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years, float Depth, float nthick, float WieltingPoint, float InitialCa,
- float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor)
+vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
+ double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor)
 {
 	nNumOfDays = years*365;
 	nDepth = Depth;
@@ -59,22 +59,22 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 	CSO4 = meqSoil2molar(initialSO4, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
 	
 	int nMonth;
-	float nTemp;
-	float nDailyPET;
-	float nDailyAET;
-	float nDailyRain;
+	double nTemp;
+	double nDailyPET;
+	double nDailyAET;
+	double nDailyRain;
 	int nWDComp = 0;
 	int nRainEvents = 0;
-	int nRainVecLength = RainArr.size();
+	int nRainVecLength = int(RainArr.size());
 	
 	// create list with all compartment
-	vector<float> vect;
-	vector<float> Gypsum;
-	vector<float> CompWash;
-	vector<float> floodComp;
-	vector<float> AETLoss;
-	vector<float> dayRain;
-	vector<float> WD;
+	vector<double> vect;
+	vector<double> Gypsum;
+	vector<double> CompWash;
+	vector<double> floodComp;
+	vector<double> AETLoss;
+	vector<double> dayRain;
+	vector<double> WD;
 	//vect.erase(0, vect.length());
 
 	nNumOfDays =   std::min(nNumOfDays, nRainVecLength);
@@ -85,7 +85,7 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 		nMonth = ((day % 365) / 31);
 		nTemp = 25;
 		nDailyPET = PET[day]/10; 
-		nDailyRain = RainArr[day];
+		nDailyRain = RainArr[day]/10;
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
@@ -101,7 +101,7 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 		Months[nMonth].totalAET += AET;
 		nDailyAET = AET;
 		//AET = AET * 10;
-		nTotalAet += AET;
+		nTotalAet += nDailyAET;
 		
 		nTotalRain += nDailyRain;
 		Compartments[0].nMoist += nDailyRain;   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
@@ -118,36 +118,36 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 		}
 
 		// This is the second loop that runs through the soil profile
-		for (int d = 0; d < nNumOfCompatments; d++)
+		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
 		{
 
 			//  taking into account the AET for this current compartment, and updating the AET value
 			// moist - wieltingPOint is the water available for evaporation
-			if (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt) < AET)
+			if (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt) < AET)
 			{
-				AET = AET - (Compartments[d].nMoist - (Compartments[d].nThetaWeildingPnt));
-				Compartments[d].fAETLoss += Compartments[d].nMoist - Compartments[d].nThetaWeildingPnt;
-				Compartments[d].nMoist = Compartments[d].nThetaWeildingPnt;
+				AET = AET - (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt));
+				Compartments[CurrentComp].fAETLoss += Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nThetaWeildingPnt;
+				Compartments[CurrentComp].nMoist = Compartments[CurrentComp].nThetaWeildingPnt;
 			}
 			else
 			{
-				Compartments[d].nMoist -= AET; 
-				Compartments[d].fAETLoss += AET;
+				Compartments[CurrentComp].nMoist -= AET; 
+				Compartments[CurrentComp].fAETLoss += AET;
 				AET = 0.0;
 			}
 
 			
-			if (Compartments[d].nMoist > (Compartments[d].nWhc)) 
+			if (Compartments[CurrentComp].nMoist > (Compartments[CurrentComp].nWhc)) 
 			{				
 				// determines the leachate by substracting the field capacity from the moisture content
-				nLeachate = Compartments[d].nMoist - (Compartments[d].nWhc);
-				Compartments[d].nFloodedCount++;
-				nWDComp = d+1;
+				nLeachate = Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nWhc);
+				Compartments[CurrentComp].nFloodedCount++;
+				nWDComp = CurrentComp+1;
 			}
 			// in case the comp is floated without leaching
-			else if(Compartments[d].nMoist == (Compartments[d].nWhc))			{			
+			else if(Compartments[CurrentComp].nMoist == (Compartments[CurrentComp].nWhc))			{			
 				
-				Compartments[d].nFloodedCount++;
+				Compartments[CurrentComp].nFloodedCount++;
 				nLeachate = 0.0;				
 			}
 			else
@@ -155,16 +155,16 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 				nLeachate = 0.0;
 			}
 			
-			Compartments[d].fTotLeachate += nLeachate;
+			Compartments[CurrentComp].fTotLeachate += nLeachate;
 
 			// subtract the leachate from the moisture of the  compartment
-			Compartments[d].nMoist -= nLeachate; 
+			Compartments[CurrentComp].nMoist -= nLeachate; 
 
 			//calculating gypsum concentration and ion available for washing
 			// only if moist change since yesterday
-			if (Compartments[d].nMoist != Compartments[d].nLastMoist) {
-				Compartments[d].solubility(nTemp);
-				Compartments[d].nLastMoist = Compartments[d].nMoist;
+			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
+				Compartments[CurrentComp].solubility(nTemp);
+				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
 			}
 			
 			//start washing down
@@ -173,25 +173,25 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 			{	
 				//wash to next compartment or to leachete
 				// ion are in mol
-				if (d != nNumOfCompatments - 1) {
-					Compartments[d + 1].C_Ca += Compartments[d].C_Ca;
-					Compartments[d + 1].C_SO4 += Compartments[d].C_SO4;
-					Compartments[d + 1].nMoist += nLeachate;
+				if (CurrentComp != nNumOfCompatments - 1) {
+					Compartments[CurrentComp + 1].C_Ca += Compartments[CurrentComp].C_Ca;
+					Compartments[CurrentComp + 1].C_SO4 += Compartments[CurrentComp].C_SO4;
+					Compartments[CurrentComp + 1].nMoist += nLeachate;
 				}
 				else
 				{
-					nTotalCaLeachate += Compartments[d].C_Ca;
-					nTotalSO4Leachate += Compartments[d].C_SO4;
+					nTotalCaLeachate += Compartments[CurrentComp].C_Ca;
+					nTotalSO4Leachate += Compartments[CurrentComp].C_SO4;
 					nTotalLeachate += nLeachate;
-					nWDComp = d;
+					nWDComp = CurrentComp;
 				}
 
-				Compartments[d].C_Ca = 0;
-				Compartments[d].C_SO4 = 0;
+				Compartments[CurrentComp].C_Ca = 0;
+				Compartments[CurrentComp].C_SO4 = 0;
 				nLeachate = 0;
 			}		
 
-			nTotalMoist += Compartments[d].nMoist;
+			nTotalMoist += Compartments[CurrentComp].nMoist;
 		}
 
 		
@@ -225,10 +225,9 @@ vector<float> CSM::Calculate(vector<float> rain, vector<float> PET, float years,
 		CompWash.push_back(it->fTotLeachate);
 		AETLoss.push_back(it->fAETLoss); 
 		floodComp.push_back(it->nFloodedCount);		
-		Gypsum.push_back(molar2meqSoil(it->C_CaSO4, 5, moistcm2Litre(it->nMoist)));
+		Gypsum.push_back(mol2meqSoil(it->C_CaSO4,5));
 
 	}
-	
 	
 	/*Rcout << "total moist in soil: " << nTotalMoist << endl <<
 		"total leachate: " << nLeachate << endl <<
@@ -263,19 +262,20 @@ std::vector<Compartment>* CSM::GetCompartments()
 
 
 //input meq/100g return mol/Litre
-float CSM::meqSoil2molar(float fMeq, float SoilVolume, float moisture)
+double CSM::meqSoil2molar(double fMeq, double SoilVolume, double moisture)
 {
 	//fmeq is meq/100g soil . multiply by bukl denisty[g/cm3] divide by 100[gr soil ] mult by soilVolume [cm3] mult by 0.5[mmol/meq] mult by 0.001 [mol/mmol] divide by moisture
 	return(fMeq * 1.44* SoilVolume/100  *0.5* 0.001 / moisture );
 }
 
-//input mol/Litre mult by moisture [litre] mult by 0.002 [meq/mol] divide by volume return meq/100g soil
-float CSM::molar2meqSoil(float molar, float SoilVolume, float moisture)
+//input mol and multiply by 2000 [meq/mol] divide by compartment soil wight and multiply to represent 100 g soil
+double CSM::mol2meqSoil(double molar, double SoilVolume)
 {
-	return ((molar * moisture * 0.002 /(SoilVolume*1.44))*  100  );
+	double inMeq = molar * 2000;
+	return (( inMeq * 100/(SoilVolume*1.44))  );
 }
 
-float CSM::moistcm2Litre(float moist_cm) {
+double CSM::moistcm2Litre(double moist_cm) {
 	return(moist_cm*0.001F);
 }
 
@@ -288,7 +288,7 @@ CSM::~CSM()
 	printf ("csm destructor\n");
 }
 
-float CSM::GetPrecision(float x)
+double CSM::GetPrecision(double x)
 {
 	return(((int)(x*10000.0)) / 10000.0F);
 }
@@ -311,12 +311,12 @@ void CSM::InitCompartments()
 void CSM::InitMonths()
 {
   //NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
-  float II = 0.0;
-	float a = 0;
-	float PET = 0;
-	float PETdaily = 0;
-	float pan = 0;
-	float panDaily = 0;
+  double II = 0.0;
+	double a = 0;
+	double PET = 0;
+	double PETdaily = 0;
+	double pan = 0;
+	double panDaily = 0;
 
 	// calculate heat index
 	for (int i = 0; i < 12; i++)
@@ -355,57 +355,8 @@ void CSM::InitMonths()
 
 }
 
-MONTH CSM::GetMonth(int nDay)
-{
-	MONTH month = Jan;
-	nDay = JULIAN(nDay);
-	if (nDay <= 31)
-		month = Oct;
-	else
-		if (nDay <= 59)
-			month = Nov;
-		else
-			if (nDay <= 90)
-				month =Dec;
-			else
-				if (nDay <= 120)
-					month = Jan;
-				else
-					if (nDay <= 151)
-						month = Feb;
-					else
-						if (nDay <= 181)
-							month = Apr;
-						else
-							if (nDay <= 212)
-								month = May;
-							else
-								if (nDay <= 243)
-									month = Jun;
-								else
-									if (nDay <= 273)
-										month = Jul;
-									else
-										if (nDay <= 304)
-											month = Aug;
-										else
-											if (nDay <= 334)
-												month = Sep;
-											else
-												if (nDay <= 365)
-													month = Oct;
-	return month;
 
-}
 
-float CSM::JULIAN(int day)
-
-{
-	int julian;
-
-	julian = day - ((long)(day / 365) * 365);
-	return julian;
-}
 
 // [[Rcpp::plugins(cpp11)]]
 //RCPP_MODULE(CSM_MODULE) {

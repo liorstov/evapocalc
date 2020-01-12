@@ -1084,7 +1084,7 @@ namespace io{
                                 x = -x;
                 }
 
-                template<class overflow_policy> void parse(char*col, float&x) { parse_float(col, x); }
+                template<class overflow_policy> void parse(char*col, double&x) { parse_float(col, x); }
                 template<class overflow_policy> void parse(char*col, double&x) { parse_float(col, x); }
                 template<class overflow_policy> void parse(char*col, long double&x) { parse_float(col, x); }
 

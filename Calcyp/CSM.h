@@ -17,64 +17,61 @@
 using namespace std;
 
 
-typedef enum { WINTER, SPRING, SUMMER } SEASON;
 
 
 class CSM
 {
 public:
 	CSM();
-	vector<float> Calculate(vector<float>, vector<float>,float years, float Depth, float nthick, float WieltingPoint, float InitialCa,
-						float initialSO4, float nBulkDensity, float FieldArea, float FieldCapacity, float DustCa, float DustSO4, float AETFactor);
+	vector<double> Calculate(vector<double>, vector<double>,int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
+						double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor);
 	std::vector<Compartment>* GetCompartments();
-	float meqSoil2molar(float, float, float moisture);
-	float molar2meqSoil(float, float, float moisture);
-	float moistcm2Litre(float);
+	double meqSoil2molar(double, double, double moisture);
+	double mol2meqSoil(double, double);
+	double moistcm2Litre(double);
 	~CSM();
-	float GetPrecision(float);
+	double GetPrecision(double);
 	//Rcpp::List GetResults();
 	int nNumOfDays;
-	float nDepth;
-	float thick;
+	int nDepth;
+	int thick;
 	int nNumOfCompatments;
-	float nArea;
-	float nTotalCaDust;
-	float nTotalRain;
-	float nTotalCaLeachate;
-	float nTotalSO4Leachate;
-	float nTotalLeachate;
-	float nTotalMoist;
-	float nInitMoistTotal;
-	float nTotalAet;
-	float nTotalWP;
-	float nTotalWhc;
+	int nArea;
+	double nTotalCaDust;
+	double nTotalRain;
+	double nTotalCaLeachate;
+	double nTotalSO4Leachate;
+	double nTotalLeachate;
+	double nTotalMoist;
+	double nInitMoistTotal;
+	double nTotalAet;
+	double nTotalWP;
+	double nTotalWhc;
 	void InitMonths();
-	float BulkDensity;
-	float accumolateDustDays;
+	double BulkDensity;
+	double accumolateDustDays;
 	
 	//Rcpp::List results;
 	void InitCompartments();
-	MONTH GetMonth(int nDay);
-	float JULIAN(int day);
 
 
 	std::vector<Compartment> Compartments;
 	std::vector<Month> Months;
-	vector<float> RainArr;
-	float AET;
+	vector<double> RainArr;
+	double AET;
 
 	
-	float nDailyDustCa;
-	float nDailyDustSO4;
-	float wieltingPoint;
-	float nFieldCapacity;
-	float CCa;
-	float CSO4;
-	float nCaco3less;
+	double nDailyDustCa;
+	double nDailyDustSO4;
+	double wieltingPoint;
+	double nFieldCapacity;
+	double CCa;
+	double CSO4;
+	double nCaco3less;
 	
 	
-	float nTemp;
-	float nLeachate;
+	double nTemp;
+	double nLeachate;
 
 	double TempArr[12] = { 20,21,24.7,29.7,31.4,37.6,39.4,39.4,36.5,32,26.5,27.1};
 };

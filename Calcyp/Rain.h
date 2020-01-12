@@ -10,14 +10,15 @@ public:
 
 	~WG();
 
-	vector<float> rain;
-	vector<float> PET;
-	float totalrain;
+	vector<double> rain;
+	vector<double> PET;
+	double totalrain;
 
+	void writeRes(vector<double>);
 private:
-	vector<pair<float, float> > Interval, Amount;
+	vector<pair<double, double> > Interval, Amount;
 
 	int getRandomInterval();
-	float getRandomAmount();
+	double getRandomAmount();
 };
 

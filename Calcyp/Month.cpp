@@ -5,7 +5,7 @@
 
 
 
-Month::Month(int _Number, float _temp, float _PanDaily, float _PETdaily, float _PET, float _pan) 
+Month::Month(int _Number, double _temp, double _PanDaily, double _PETdaily, double _PET, double _pan) 
 	: nNumber(MONTH(_Number)) , nTemp(_temp), PanDaily(_PanDaily), PETdaily(_PanDaily), PET(_PET), pan(_pan), totalAET(0)
 {
 

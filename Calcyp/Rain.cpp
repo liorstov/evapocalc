@@ -14,16 +14,15 @@ WG::WG()
 	// Open an existing file 
 	ifstream fin("../synthRain.csv", ios::in);
 
-	float I, year, day, rain, ser, PET, K;
-	string temp;
+	string temp, year;
 	// Read the Data from the file 
 	// as String Vector 
-
+	year = "0";
 	if (fin.is_open()) {
 		getline(fin, temp);
-		while (fin.good()) {
+		while (fin.good() && stoi(year) <= 2000) {
 			getline(fin, temp, ',');
-			getline(fin, temp, ',');
+			getline(fin, year, ',');
 			getline(fin, temp, ',');
 			getline(fin, temp, ',');
 
@@ -43,8 +42,22 @@ WG::WG()
 
 WG::~WG()
 {
-	 
 	
+
+	
+}
+
+void WG::writeRes(vector<double> res)
+{
+	ofstream fout("../Res.csv", ios::out);
+	if (fout.is_open())
+	{
+		for (size_t i = 0; i < res.size(); i++)
+		{
+			fout << res[i] << endl;
+		}
+		fout.close();
+	}
 }
 
 int WG::getRandomInterval()
@@ -52,7 +65,7 @@ int WG::getRandomInterval()
 	return 0;
 }
 
-float WG::getRandomAmount()
+double WG::getRandomAmount()
 {
 	return 0.0f;
 }

@@ -14,7 +14,7 @@ void UI::Print()
 	fOutput.open("./../DB/output.txt", fstream::out);
 	const std::vector<Compartment> &Comp =  *Handler.GetCompartments();
 
-	float totalcaco3 = 0;
+	double totalcaco3 = 0;
 	if (fOutput.is_open())
 	{
 		fOutput << "time (years) = " << Handler.nNumOfDays << endl;
