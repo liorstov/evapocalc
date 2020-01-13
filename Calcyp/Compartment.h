@@ -9,35 +9,37 @@ using namespace std;
 class Compartment
 {
 public:
-	Compartment(int , int, float, float, float , float , float);
+	Compartment(int , int, double, double, int , double, double);
 	
 	~Compartment();
 	
-	float solubility(float temp);
-	pair<float, float> quadricEquation(float, float, float);
+	double solubility(double temp);
+	pair<double, double> quadricEquation(double, double, double);
 	void setAllToZero();
-	float GetIOnsSum();
+	double GetIOnsSum();
+	double nonNegetiveX(pair<double, double>&, double, double);
+	double nonNegetiveX(pair<double, double>&, double);
 
-	float fDepth;
+	double fDepth;
 	int nthick;
 	int nArea;
-	float nThetaWeildingPnt;
-	float nFieldCapacity;
-	float nWhc;					//water holding capacity
-	float nInitTotMoist;
-	float nMoist;				// moisture level
-	float nCCa;					//soluble Ca ion [mmol]
-	float C_SO4;				//solunle so4 anion [mmol]
-	float C_CaSO4;				//solid gypsum in mmol
-	float nLastMoist;
-	float nCO2;
-	float nSolubleCa;
-	float nTotMoist;			//summing the total moisture in the soil profile. if there are 10 compartments of 10cm each, total moisture is 8.05cm
-	float CcaLess;
-	float CSO4Less;
+	double nThetaWeildingPnt;
+	double nFieldCapacity;
+	double nWhc;					//water holding capacity
+	double nInitTotMoist;
+	double nMoist;				// moisture level
+	double C_Ca;					//soluble Ca ion [mmol]
+	double C_SO4;				//solunle so4 anion [mmol]
+	double C_CaSO4;				//solid gypsum in mmol
+	double nLastMoist;
+	double nCO2;
+	double nSolubleCa;
+	double nTotMoist;			//summing the total moisture in the soil profile. if there are 10 compartments of 10cm each, total moisture is 8.05cm
+	double CcaLess;
+	double CSO4Less;
 	int nWetCount;
-	float fTotLeachate;
-	float fAETLoss;
+	double fTotLeachate;
+	double fAETLoss;
 	int nFloodedCount;
 
 };

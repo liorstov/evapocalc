@@ -46,12 +46,12 @@ Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose
 
 
 
-duration = 1000
+duration = 2000
 
 
 #soil
-res = CalcGypsum(SynthRain, duration, plotRes = 1, Depth = 100, AETFactor = 0.6, FieldCapacity = 0.19, wieltingPoint = 0.02);
-
+result1 = CalcGypsum(SynthRain, duration, plotRes = 0, Depth = 100, AETFactor = 0.6, FieldCapacity = 0.19, wieltingPoint = 0.02);
+plotSoilResults(result1);
 #Test real rain
 IMSRain$year = IMSRain$waterYear %% IMSRain$waterYear[1] + 1
 IMSRainTest = IMSRain %>% left_join(SynthRain %>% dplyr::select(-rain) %>% filter(year <= max(IMSRain$year)), by = c("dayIndex", "year"))

@@ -67,10 +67,13 @@ comp2Depth = function(comp, thick = 5) {
     return((comp-1+0.5)*thick)
 }
 plotSoilResults = function(res) {
-    resLeach = tibble(leachate = res$CompWash, wetZone = res$WetZone / duration) %>% rowid_to_column %>% mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * 5)
+    resLeach = tibble(leachate = res$CompWash, wetZone = res$WetZone / duration) %>% rowid_to_column %>%
+                        mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * 5, gypsum = res$gypsum)
 
-    WP1 = ggplot(resLeach) + geom_bar(aes(x = depth, y = WaterFluxOut), fill = "navyblue", stat = "identity", show.legend = FALSE) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip() +
-                    scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+    WP1 = ggplot(resLeach) + geom_bar(aes(x = depth, y = WaterFluxOut * 100), fill = "navyblue", stat = "identity", show.legend = FALSE) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip() +
+                    scale_y_continuous(name = "CaSO4 mEq/100g soil", position = "bottom", expand = c(0, 0.0), breaks = waiver())+
+                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                    geom_line(aes(x = depth, y = gypsum, color = paste("gypsum =", resLeach$depth[which.max(res$gypsum)])), size = 2) +
                                geom_vline(aes(xintercept = res$WDp80, color = paste("WDp80 =", res$WDp80))) +
                                geom_vline(aes(xintercept = res$meanWD, color = paste("meanWD = ", res$meanWD))) +
                                geom_vline(aes(xintercept = res$Index30, color = paste("Index30 = ", res$Index30))) +
@@ -78,19 +81,20 @@ plotSoilResults = function(res) {
                                 geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03)))+
                                 geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)))
 
-    percent = tibble(Depth = quantile(res$WD[,2], seq(0, 1, 0.1)), WDpercentile = seq(0, 1, 0.1))
+    #percent = tibble(Depth = quantile(res$WD[,2], seq(0, 1, 0.1)), WDpercentile = seq(0, 1, 0.1))
 
-    WP2 = ggplot(percent, aes(Depth, WDpercentile)) + geom_path(color = "navyblue", size = 0.8) + scale_x_reverse(expand = c(0.001, 0.0)) + coord_flip() + scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
-                            geom_vline(aes(xintercept = res$WDp80, color = paste("WDp80 =", res$WDp80))) +
-                               geom_vline(aes(xintercept = res$meanWD, color = paste("meanWD = ", res$meanWD))) +
-                               geom_vline(aes(xintercept = res$Index30, color = paste("Index30 = ", res$Index30))) +
-                                geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
-                                geom_vline(aes(xintercept = res$SMeanWD, color = paste("SMeanWD = ", res$SMeanWD))) +
-                                geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)))+
-                             ylab("WaterFlux [leach/total rain]")
+    #WP2 = ggplot(percent, aes((Depth-0.5)*5, WDpercentile)) + geom_path(color = "navyblue", size = 0.8) + scale_x_reverse(expand = c(0.001, 0.0)) + coord_flip() + scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                            #geom_vline(aes(xintercept = res$WDp80, color = paste("WDp80 =", res$WDp80))) +
+                               #geom_vline(aes(xintercept = res$meanWD, color = paste("meanWD = ", res$meanWD))) +
+                               #geom_vline(aes(xintercept = res$Index30, color = paste("Index30 = ", res$Index30))) +
+                                #geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
+                                #geom_vline(aes(xintercept = res$SMeanWD, color = paste("SMeanWD = ", res$SMeanWD))) +
+                                #geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)))+
+                             #ylab("WaterFlux [leach/total rain]")
 
     WP3 = ggplot(resLeach) + geom_bar(aes(x = depth, y = wetZone), fill = "navyblue", stat = "identity", show.legend = FALSE) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip() +
                     scale_y_continuous(position = "bottom", expand = c(0, 0.0)) + theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                            geom_line(aes(x = depth, y = gypsum, color = "gypsum"), size = 2) +
                               geom_vline(aes(xintercept = res$WDp80, color = paste("WDp80 =", res$WDp80))) +
                                geom_vline(aes(xintercept = res$meanWD, color = paste("meanWD = ", res$meanWD))) +
                                geom_vline(aes(xintercept = res$Index30, color = paste("Index30 = ", res$Index30))) +
@@ -102,7 +106,7 @@ plotSoilResults = function(res) {
     theme(panel.grid.major = element_blank(),
     panel.grid.minor = element_blank())
 
-
+    return(ggarrange(WP1));
    return(ggarrange(WP1, WP2, WP3,WP4,nrow = 2,ncol = 2))
 
 }
