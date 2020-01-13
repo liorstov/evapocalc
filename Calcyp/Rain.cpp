@@ -12,7 +12,7 @@ WG::WG()
 {
 
 	// Open an existing file 
-	ifstream fin("../synthRain.csv", ios::in);
+	ifstream fin("../synthRainS.csv", ios::in);
 
 	string temp, year;
 	// Read the Data from the file 

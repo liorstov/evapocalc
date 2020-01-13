@@ -1,3 +1,5 @@
+.RData
+.Rhistory
 # Prerequisites
 *.d
 
@@ -384,4 +386,3 @@ healthchecksdb
 .Rapp.history
 
 # Session Data files
-.RData

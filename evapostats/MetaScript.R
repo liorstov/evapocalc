@@ -25,7 +25,7 @@ source("evapostats/RainGen.R");
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
+IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
 rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
 PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
 

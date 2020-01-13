@@ -11,7 +11,7 @@ int main()
 	
 	CSM * Calc = new CSM();
 	
-	vector<double> res = Calc->Calculate(rainPET.rain, rainPET.PET, 1999, 100, 5, 0.02, 0, 0, 1.44, 1, 0.19, 1.5, 1.5,0.6 );
+	vector<double> res = Calc->Calculate(rainPET.rain, rainPET.PET, 500, 100, 5, 0.02, 0, 0, 1.44, 1, 0.19, 1.5, 1.5,0.6 );
 
 	rainPET.writeRes(res);
 
