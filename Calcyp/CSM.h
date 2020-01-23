@@ -6,7 +6,6 @@
 #include <stack>
 #include <stdio.h>
 #include "Compartment.h"
-#include "Month.h"
 #include <Rcpp.h>
 
 
@@ -22,9 +21,10 @@ class CSM
 {
 public:
 	CSM();
-	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
-		double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor);
+	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick, double WieltingPoint,
+ double InitialCa,double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose);
 	std::vector<Compartment>* GetCompartments();
+	Rcpp::NumericMatrix output2Matrix(Rcpp::DoubleVector & inputVector, bool verbose);
 	double meqSoil2molar(double, double,double);
 	double mol2meqSoil(double, double);
 	double moistcm2Litre(double);
@@ -47,7 +47,6 @@ public:
 	float nTotalAet;
 	float nTotalWP;
 	float nTotalWhc;
-	void InitMonths();
 	float BulkDensity;
 	float accumolateDustDays;
 	
@@ -57,7 +56,6 @@ public:
 
 
 	std::vector<Compartment> Compartments;
-	std::vector<Month> Months;
 	Rcpp::NumericVector RainArr;
 	float AET;
 

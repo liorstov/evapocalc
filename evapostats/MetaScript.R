@@ -5,6 +5,7 @@ require(ggplot2)
 require(reshape2)
 require(zoo)
 require(tictoc)
+require(R.matlab)
 
 
 theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
@@ -25,7 +26,7 @@ source("evapostats/RainGen.R");
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
+IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
 rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
 PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
 
@@ -44,14 +45,25 @@ dev.off()
 
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild =0);b <<- new(CSMCLASS);
 
-
-
-duration = 2000
+duration =500
 
 
 #soil
-result1 = CalcGypsum(SynthRain, duration, plotRes = 0, Depth = 100, AETFactor = 0.6, FieldCapacity = 0.19, wieltingPoint = 0.02);
-plotSoilResults(result1);
+result = CalcGypsum(kiki1, duration, plotRes = 0, Depth = 100, AETFactor = 0.5, FieldCapacity = 0.19, wieltingPoint = 0.013, thick = 4, verbose =1);
+plotSoilResults(results[1])
+
+
+#sandbox
+
+kiki1 = SynthRainE %>% filter(year == 1550, dayIndex >= 160 & dayIndex <= 161)
+
+
+taliRain = readMat("DB\\RainTali.mat")
+taliRain = as_tibble(taliRain$data) %>% dplyr::select(year = V1, dayIndex = V2, rain = V3)
+taliRain %>% group_by(year) %>% summarise(a = sum(rain), sum(rain)) %>% summarise(mean(a))
+
+taliRain = as_tibble(taliRain) %>% left_join(SynthRain  %>% filter(year<=500)%>% dplyr::select(myRain = rain, dayIndex, year, PET, - K, - SeriesNumber), by = c("year", "dayIndex"))
+
 #Test real rain
 IMSRain$year = IMSRain$waterYear %% IMSRain$waterYear[1] + 1
 IMSRainTest = IMSRain %>% left_join(SynthRain %>% dplyr::select(-rain) %>% filter(year <= max(IMSRain$year)), by = c("dayIndex", "year"))
@@ -64,7 +76,9 @@ gc(reset = TRUE)
 
 #----
 
-FCarray = seq(0.1, 0.4, length = 10);
+
+
+FCarray = seq(0.05, 0.2, length = 30);
 wiltingPointArray = seq(0.01, 0.02,length = 10);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 0.1, to = 1, length = 10);
@@ -72,7 +86,24 @@ RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
 initIonArray = seq(from = 1, to = 20, length = 45);
 AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 
-results = lapply(wiltingPointArray, FUN = function(X) CalcGypsum(elat[[1]], duration = 1000, wieltingPoint = X, plotRes = FALSE));
+
+#FC sensitivity---
+
+results = lapply(FCarray, FUN = function(X) CalcGypsum(kiki1, duration = 1, plotRes = 0, Depth = 100, AETFactor = 0, FieldCapacity = X, wieltingPoint = 0.013, thick = 5, verbose=1));
+plotMoisture(results[[13]])
+fctbl = tibble(FC = FCarray, rmsd =  results %>% map_dbl(plotMoisture))
+ggplot(fctbl) + geom_line(aes(x = FC, y = rmsd)) + scale_x_continuous(breaks = unique(fctbl$FC))
+fctbl$FC[which.min(fctbl$rmsd)]
+#----
+
+results %>% map_dbl(plotMoisture) %>% plot(type ="l")
+
+test = tibble(SMeanWD = results %>% map(~pluck(., c("SMeanWD"))) %>% unlist(),
+                Index3 = results %>% map(~pluck(., c("Index03"))) %>% unlist(),
+                SWDp80 = results %>% map(~pluck(., c("SWDp80"))) %>% unlist()) %>% rowid_to_column() %>% gather(Index, depth, - rowid)
+ggplot(test) + geom_line(aes(x = rowid * 70, y = depth, color = Index)) + scale_y_reverse(expand = c(0, 0.0), limits = c(50, 0)) +
+                        scale_x_continuous(expand = c(0, 0.0), name = "years")
+#---
 #list of retrun variables (fucking genius)
 results = results %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
             map(~melt(.x, id.vars = "rowid", measure.vars = "value"))

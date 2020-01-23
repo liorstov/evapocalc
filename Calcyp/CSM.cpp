@@ -31,17 +31,16 @@ CSM::CSM()
 }
 
 
-Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
- double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor)
+Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint,
+ double InitialCa, double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose)
 {
-	int nMonth;
 	double nTemp;
 	double nDailyPET = 0;
 	double nDailyAET = 0;
 	double nDailyRain = 0;
 	int nWDComp = 0;
 	int nRainEvents = 0;
-	int nRainVecLength = RainArr.length();
+	int nRainVecLength = rain.length();
 
 	nTotalWhc = 0;
 	nTotalCaDust = 0;
@@ -76,7 +75,6 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	nTotalMoist = wieltingPoint * nNumOfCompatments;//[cm]
 	nInitMoistTotal = nTotalMoist;
 	InitCompartments();
-	InitMonths();
 
 	CCa =meqSoil2molar(InitialCa, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
 	CSO4 = meqSoil2molar(initialSO4, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
@@ -86,19 +84,19 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	// create list with all compartment
 	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create(); 
 	Rcpp::DoubleVector Gypsum = Rcpp::DoubleVector::create(); 
+	Rcpp::DoubleVector moisture = Rcpp::DoubleVector::create();
 	Rcpp::DoubleVector CompWash = Rcpp::DoubleVector::create();
 	Rcpp::DoubleVector floodComp = DoubleVector::create();
 	Rcpp::DoubleVector AETLoss = DoubleVector::create();
 	Rcpp::DoubleVector dayRain = DoubleVector::create();
 	Rcpp::DoubleVector WD = DoubleVector::create();
 	Gypsum.erase(0, Gypsum.length());
-
+	
 	nNumOfDays =   std::min(nNumOfDays, nRainVecLength);
-
+	Rcpp::Rcout << nNumOfDays << endl;
 	//main loop over days
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
-		nMonth = ((day % 365) / 31);
 		nTemp = 25;
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
@@ -114,7 +112,6 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		nTotalMoist = 0;
 		AET *= AETFactor;
 		
-		Months[nMonth].totalAET += AET;
 		nDailyAET = AET;
 		//AET = AET * 10;
 		nTotalAet += nDailyAET;
@@ -137,22 +134,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
 		{
 
-			//  taking into account the AET for this current compartment, and updating the AET value
-			// moist - wieltingPOint is the water available for evaporation
-			if (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt) < AET)
-			{
-				AET = AET - (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt));
-				Compartments[CurrentComp].fAETLoss += Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nThetaWeildingPnt;
-				Compartments[CurrentComp].nMoist = Compartments[CurrentComp].nThetaWeildingPnt;
-			}
-			else
-			{
-				Compartments[CurrentComp].nMoist -= AET; 
-				Compartments[CurrentComp].fAETLoss += AET;
-				AET = 0.0;
-			}
-
-			
+			//WASHING
 			if (Compartments[CurrentComp].nMoist > (Compartments[CurrentComp].nWhc)) 
 			{				
 				// determines the leachate by substracting the field capacity from the moisture content
@@ -176,6 +158,25 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			// subtract the leachate from the moisture of the  compartment
 			Compartments[CurrentComp].nMoist -= nLeachate; 
 
+
+			// EVAPORATING
+			//  taking into account the AET for this current compartment, and updating the AET value
+			// moist - wieltingPOint is the water available for evaporation
+			if (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt) < AET)
+			{
+				AET -= (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt));
+				Compartments[CurrentComp].fAETLoss += Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nThetaWeildingPnt;
+				Compartments[CurrentComp].nMoist = Compartments[CurrentComp].nThetaWeildingPnt;
+			}
+			else
+			{
+				Compartments[CurrentComp].nMoist -= AET; 
+				Compartments[CurrentComp].fAETLoss += AET;
+				AET = 0.0;
+			}
+
+			
+			//CHEMISTRY
 			//calculating gypsum concentration and ion available for washing
 			// only if moist change since yesterday
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
@@ -183,7 +184,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
 			}
 			
-			//start washing down
+			//LEACHATE
 			//  examin if we reached saturation
 			if (nLeachate > 0)
 			{	
@@ -210,29 +211,30 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			nTotalMoist += Compartments[CurrentComp].nMoist;
 		}
 
+		// Write to output
 		
-		for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
-			//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
-		//	WD.push_back(it->nMoist);
-			//Gypsum.push_back(it->C_CaSO4);
-
+		if (verbose == 1)
+		{
+			WD.push_back(day);		
+			WD.push_back(nDailyRain);	
+			WD.push_back(nDailyAET);			
+			WD.push_back(nTotalMoist);
+			WD.push_back((nWDComp + 0.5)*nthick);
+			for (std::vector<Compartment>::iterator it = Compartments.begin(); (it - Compartments.begin()) < 15 ; ++it) {
+				WD.push_back(it->nMoist);			
+			}
+			
 		}
-
-		if (nDailyRain > 0 )
+		else if (nDailyRain > 0 )
 		{
 			nRainEvents++;
-			Compartments[nWDComp].nWetCount++;
-
-			WD.push_back(day);		
-		WD.push_back(nDailyRain);	
-		WD.push_back(nDailyAET);
-		WD.push_back((nWDComp + 0.5)*nthick);	
-		WD.push_back(nTotalMoist);
+			Compartments[nWDComp].nWetCount++;	
+			WD.push_back(day);
+			WD.push_back((nWDComp + 0.5)*nthick);
+		
 		}
+		
 		nWDComp = 0;
-
-		
-		
 		
 	}
 
@@ -242,9 +244,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		CompWash.push_back(it->fTotLeachate);
 		AETLoss.push_back(it->fAETLoss); 
 		floodComp.push_back(it->nFloodedCount);
-		Gypsum.push_back(mol2meqSoil(it->C_CaSO4,5));
-
+		Gypsum.push_back(mol2meqSoil(it->C_CaSO4,thick));
+		moisture.push_back(it->nMoist);
 	}
+	Rcout << WD.length() << verbose<< endl;
+
 	
 	
 	/*Rcout << "total moist in soil: " << nTotalMoist << endl <<
@@ -256,11 +260,10 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	/*Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
 	NumericMatrix GypsumMat = transpose(as<NumericMatrix>(Gypsum));*/
 
-	WD.attr("dim") = Dimension(5, WD.length() / (5));
-	NumericMatrix WDMat = transpose(as<NumericMatrix>(WD));
-	colnames(WDMat) = CharacterVector::create("day","rain","AET", "WD","soilMoisture");
+	
 	results = Rcpp::List::create(_["gypsum"] = Gypsum,
-		_["WD"] = WDMat,
+		_["WD"] = output2Matrix(WD, verbose),
+		_["moist"] = moisture,
 		_["WetZone"] = floodComp,
 		_["AET"] = nTotalAet,
 		_["AETLoss"] = AETLoss,		
@@ -276,7 +279,24 @@ std::vector<Compartment>* CSM::GetCompartments()
 	return &Compartments;
 }
 
-
+Rcpp::NumericMatrix CSM::output2Matrix(Rcpp::DoubleVector & inputVector, bool verbose) 
+{
+	Rcpp::NumericMatrix outputMat;
+	if (verbose == 1)
+	{
+		inputVector.attr("dim") = Dimension(20, inputVector.length() / (20));
+		outputMat = transpose(as<NumericMatrix>(inputVector));
+		Rcpp::colnames(outputMat) = CharacterVector::create("day", "rain", "AET", "WD", "soilMoisture", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15");
+	}
+	else
+	{
+		inputVector.attr("dim") = Dimension(2, inputVector.length() / (2));
+		outputMat = transpose(as<NumericMatrix>(inputVector));
+		Rcpp::colnames(outputMat) = CharacterVector::create("day", "WD");
+	}
+	Rcout << outputMat.nrow() << " " << outputMat.ncol() << endl;
+	return(outputMat);
+}
 
 //input meq/100g return mol/Litre
 double CSM::meqSoil2molar(double fMeq, double SoilVolume, double moisture)
@@ -328,52 +348,13 @@ void CSM::InitCompartments()
 	}
 }
 
-void CSM::InitMonths()
-{
-  //NumericVector returnList = NumericVector::create(1,2,3,4,5,6,7,8,9,10,11,12);
-  double II = 0.0;
-	double a = 0;
-	double PET = 0;
-	double PETdaily = 0;
-	double pan = 0;
-	double panDaily = 0;
 
-	// calculate heat index
-	for (int i = 0; i < 12; i++)
-	{		
-		II = II + pow((TempArr[i] / 5.0), 1.514);
-	}
-
-	a = (6.75*pow(10.0, -7.0)*pow(II, 3.0)) - (7.71*pow(10.0, -5.0)*pow(II, 2.0)) + (0.01792*II) + 0.49239;
-
-	for (int i = 0; i < 12; i++)
-	{
-		// calculates PET [cm/month] according to Thornthwaite (1948) and PEV [cm/month] according to equations in figure 3 of Marion et al (1985)
-		PET = 1.6*pow((10.0*TempArr[i] / II), a);
-		PETdaily = PET / 30;
-
-		
-		if (i < 7)
-		{
-			pan = ((17.07*exp(-0.1309*TempArr[i])) + 1.91)*PET;
-			panDaily = ((17.07*exp(-0.1309*TempArr[i])) + 1.91)*PETdaily;
-		}
-		else
-		{
-			pan = ((13.67*exp(-0.13*TempArr[i])) + 1.35)*PET;
-			panDaily = ((13.67*exp(-0.13*TempArr[i])) + 1.35)*PETdaily;
-		}
-
-		Months.push_back(Month(i, TempArr[i], panDaily, PETdaily, PET, pan));
-		//returnList[i] = 20;
-	}
 	
-	//return returnList;
 
 	
 
 
-}
+
 
 
 
@@ -388,7 +369,6 @@ RCPP_MODULE(CSM_MODULE) {
 		"Docstring for stats")
 		
 
-	.method("InitMonths", &CSM::InitMonths, "desc")
 	.field("RainArr", &CSM::RainArr, "rain array")
 	;
 }

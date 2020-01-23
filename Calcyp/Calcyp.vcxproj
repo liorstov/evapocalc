@@ -121,20 +121,10 @@
   <ItemGroup>
     <ClInclude Include="Compartment.h" />
     <ClInclude Include="CSM.h" />
-    <ClInclude Include="csv.h" />
-    <ClInclude Include="DB.h" />
-    <ClInclude Include="Month.h" />
-    <ClInclude Include="Rain.h" />
-    <ClInclude Include="UI.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Compartment.cpp" />
     <ClCompile Include="CSM.cpp" />
-    <ClCompile Include="DB.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="Month.cpp" />
-    <ClCompile Include="Rain.cpp" />
-    <ClCompile Include="UI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\DB\averagerainfall_winter.txt" />
