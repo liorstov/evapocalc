@@ -130,5 +130,7 @@ p5 = ggplot(DailyPETE %>% left_join(DailyPETS, by = "breaks"), aes(x = breaks)) 
                                 ylab("pdf") +
                                  geom_line(aes(y = elat, color = "Elat")) +
                                  geom_line(aes(y = sdom, color = "Sedom")) +
-                                xlab("PET [mm / day]") +
-                                scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
+                                 xlab("PET [mm / day]") +
+                                 scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
+
+

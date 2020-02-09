@@ -31,15 +31,13 @@ difference <- function(MatrixOC) {
     return((depthofMaxValueObserved - depthofMaxValue));
 }
 
-CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 2.5, wieltingPoint = 0.02, InitialCa = 0, initialSO4 = 0
-                       , BulkDensity = 1.44, nArea = 1, FieldCapacity = 0.19, DustCa = 1.5, DustSO4 = 1.5, AETFactor = 0.6, RainFactor = 1, plotRes = TRUE, verbose = FALSE) {
+CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 2.5, wieltingPoint = 0.02,
+                         nArea = 1, FieldCapacity = 0.19, DustCa, DustSO4, AETFactor = 0.6, RainFactor = 1, plotRes = TRUE,
+                        verbose = FALSE, dustFlux, rainCa, rainSO4) {
 
-    #if (!exists("b")) {
-        #b = new(CSMCLASS);
-    #}
-    tic()
-    list =  b$Calculate(raindata$rain*RainFactor, raindata$PET, duration, Depth, thick, wieltingPoint, InitialCa, initialSO4, BulkDensity, nArea, FieldCapacity,
-                   DustCa, DustSO4, AETFactor, verbose);
+       tic()
+    list =  b$Calculate(raindata$rain*RainFactor, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
+                   DustCa, DustSO4, AETFactor, verbose, dustFlux, rainCa, rainSO4);
     toc()
     list$thick = thick;
     #colnames(list$WD) = c("day", "rain", "AET", "WD", "soilMoisture", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20")
@@ -54,12 +52,18 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 2.5,
     Seasonal = DayWD %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(WD = max(WD))
     list$SMeanWD = round(mean(Seasonal$WD), 2);
     list$SWDp80 = round(quantile(Seasonal$WD, 0.8),2);
-    if (plotRes) {
-         plotSoilResults(list);
-    }
-    list$WD = DayWD %>% mutate(year = day %/% 365);
+  
+    list$WD = DayWD %>% mutate(day = day+1, year = (day+1) %/% 365 +1);
     list$waterBalance = list$totalRain - sum(list$AETLoss);
-  return(list)  
+    list$duration = duration;
+    list$FC = FieldCapacity;
+    list$WP = wieltingPoint;
+
+
+    if (plotRes) {
+            plotSoilResults(list);
+    }
+    return(list)  
 }
 
 comp2Depth = function(comp, thick) {
@@ -70,13 +74,14 @@ plotSoilResults = function(res) {
                         mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * res$thick, gypsum = res$gypsum)
 
     WP1 = ggplot(resLeach) + geom_bar(aes(x = depth, y = WaterFluxOut * 100), fill = "navyblue", stat = "identity", show.legend = FALSE) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip() +
-                    scale_y_continuous(name = "CaSO4 mEq/100g soil", position = "bottom", expand = c(0, 0.0), breaks = waiver()) +
+                    scale_y_continuous(name = "CaSO4 mEq/100g soil", position = "bottom", expand = c(0, 0.0), breaks = seq(0,60,5)) +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
                     geom_line(aes(x = depth, y = gypsum, color = paste("gypsum =", resLeach$depth[which.max(res$gypsum)])), size = 1.3) +
                     geom_point(aes(x = depth, y = gypsum, color = paste("gypsum =", resLeach$depth[which.max(res$gypsum)])), size = 2) +
                                 geom_vline(aes(xintercept = res$SMeanWD, color = paste("MeanSWD = ", res$SMeanWD))) +
                                 geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
-                                geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)))
+                                geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80))) +
+                                annotate("text", 60,40,label = paste("duration = ", duration))
 
 
   

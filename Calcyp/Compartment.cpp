@@ -99,9 +99,11 @@ double Compartment::solubility(double temp)
 
 pair<double, double> Compartment::quadricEquation(double a, double b , double c)
 {
-	pair<double, double> solutions;
-	solutions.first = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
-	solutions.second = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	pair<double, double> solutions (0,0);
+	if ((pow(b, 2) - 4 * a*c) >= 0) {
+		solutions.first = (-b + sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+		solutions.second = (-b - sqrt(pow(b, 2) - 4 * a*c)) / (2 * a);
+	}	
 	return solutions;
 }
      

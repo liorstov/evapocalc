@@ -1,4 +1,5 @@
 
+load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
 require(tidyverse)
 require(Rcpp)
 require(ggplot2)
@@ -43,13 +44,11 @@ print(results);
 dev.off()
 
 
-Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild =0);b <<- new(CSMCLASS);
+Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+b <<- new(CSMCLASS);
 
-duration =500
-
-
-#soil
-result = CalcGypsum(kiki1, duration, plotRes = 0, Depth = 100, AETFactor = 0.5, FieldCapacity = 0.19, wieltingPoint = 0.013, thick = 4, verbose =1);
+duration = 740
+result = CalcGypsum(SynthRainE , duration, plotRes = 0, Depth = 100, AETFactor = 0.6, FieldCapacity = 0.16, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux= 0.0152/365,  DustCa = 128, DustSO4 = 2.4, rainCa = 35.48, rainSO4 = 20);
 plotSoilResults(results[1])
 
 
@@ -78,7 +77,7 @@ gc(reset = TRUE)
 
 
 
-FCarray = seq(0.05, 0.2, length = 30);
+FCarray = seq(0.05, 0.2, by =0.01);
 wiltingPointArray = seq(0.01, 0.02,length = 10);
 DustFluxArray = seq(from = 0.1,to =  2, length = 20);
 AETArray = seq(from = 0.1, to = 1, length = 10);
@@ -92,8 +91,7 @@ AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 results = lapply(FCarray, FUN = function(X) CalcGypsum(kiki1, duration = 1, plotRes = 0, Depth = 100, AETFactor = 0, FieldCapacity = X, wieltingPoint = 0.013, thick = 5, verbose=1));
 plotMoisture(results[[13]])
 fctbl = tibble(FC = FCarray, rmsd =  results %>% map_dbl(plotMoisture))
-ggplot(fctbl) + geom_line(aes(x = FC, y = rmsd)) + scale_x_continuous(breaks = unique(fctbl$FC))
-fctbl$FC[which.min(fctbl$rmsd)]
+ggplot(fctbl) + geom_line(aes(x = FC, y = rmsd)) + scale_x_continuous(breaks = round(unique(fctbl$FC),3))
 #----
 
 results %>% map_dbl(plotMoisture) %>% plot(type ="l")

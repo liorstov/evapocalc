@@ -21,8 +21,8 @@ class CSM
 {
 public:
 	CSM();
-	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick, double WieltingPoint,
- double InitialCa,double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose);
+	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick,
+ double WieltingPoint,int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4);
 	std::vector<Compartment>* GetCompartments();
 	Rcpp::NumericMatrix output2Matrix(Rcpp::DoubleVector & inputVector, bool verbose);
 	double meqSoil2molar(double, double,double);

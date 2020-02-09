@@ -30,14 +30,28 @@ CSM::CSM()
 	printf("csm Const\n");
 }
 
-
+//flux is gram/cm2/day
+//dust concentration is mg/gram; rain concentration is mg/l
 Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint,
- double InitialCa, double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose)
+	int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4)
 {
-	double nTemp;
+	Rcout << "years: " << years << endl <<
+		"Depth: " << Depth << endl <<
+		"thick: " << nthick << endl <<
+		"WieltingPoint: " << WieltingPoint << endl <<
+		"FieldArea: " << FieldArea << endl <<
+		"FieldCapacity: " << FieldCapacity <<  endl <<
+		"DustCa: " << DustCa << endl << "DustSO4: "  << DustSO4<< endl << "AETFactor: " << AETFactor << endl << "verbose: " << verbose << endl
+		<< "dustFlux: " << dustFlux<< endl<< "rainCa: " << rainCa << endl << "rainSO4: " << rainSO4<< endl;
+
+	double nTemp = 25;
 	double nDailyPET = 0;
 	double nDailyAET = 0;
 	double nDailyRain = 0;
+	double DailySO4Rain;
+	double DailyCaRain;
+	double inputCa = 0;
+	double outputCa = 0;
 	int nWDComp = 0;
 	int nRainEvents = 0;
 	int nRainVecLength = rain.length();
@@ -51,7 +65,6 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	nTotalMoist = 0;
 	nTotalAet = 0;
 	nInitMoistTotal = 0;
-	nTemp = 0;
 	accumolateDustDays = 0.0F;
 
 	nLeachate = 0;
@@ -62,22 +75,20 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	nArea = FieldArea;
 	nNumOfCompatments = nDepth / thick;
 	wieltingPoint = WieltingPoint*thick ;//in cm
-	BulkDensity =nBulkDensity; /// gr/cm^3
 	nFieldCapacity = FieldCapacity*thick;
 	RainArr = rain;
-	// carbonate in dust range from 0.5 to 5 [g m-2 yr-1]. 
-	//I took 0.51 [g m-2 yr-1] = 5.1*10^-5 [g cm-2 yr-1] = 1.4*10^-7 [g cm-2 day-1]
-	// then convert to [mol cm-2 day-1] 
-	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 0.02495F; //calcium molar waight 0.02495
-	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 0.0104F; //so4 molar waight 0.0104
+
+	// flux is gram/cm2/day multiple by concentration mg/g convert to g/cm2/day convert to mol/cm2/day
+	nDailyDustCa = dustFlux * DustCa / 1000 / 40.078F; //calcium molar waight 40.078
+	nDailyDustSO4 = dustFlux * DustSO4 / 1000 / 96.06F; //so4 molar waight 96.06
 
 	nTotalWhc = (nFieldCapacity - wieltingPoint) * nNumOfCompatments;//in cm
 	nTotalMoist = wieltingPoint * nNumOfCompatments;//[cm]
 	nInitMoistTotal = nTotalMoist;
 	InitCompartments();
 
-	CCa =meqSoil2molar(InitialCa, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
-	CSO4 = meqSoil2molar(initialSO4, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
+	CCa =0; // molar
+	CSO4 = 0; // molar
 	
 	
 
@@ -97,9 +108,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	//main loop over days
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
-		nTemp = 25;
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
+		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration
+		DailyCaRain = nDailyRain * 0.001*rainCa / 1000 / 40.078F;// convert cm3 to littre and multiple with concentration
+
+		inputCa += DailyCaRain + nDailyDustCa;
+
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
@@ -121,8 +136,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 		//accumolate dust and relaese when its raining 
 		if (nDailyRain > 0) {
-			Compartments[0].C_Ca += accumolateDustDays * nDailyDustCa;
-			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4;
+			Compartments[0].C_Ca += accumolateDustDays * nDailyDustCa + DailyCaRain;
+			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4 + DailySO4Rain;
 			accumolateDustDays = 0;
 		}
 		else
@@ -182,8 +197,14 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
 				Compartments[CurrentComp].solubility(nTemp);
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
+				
+				
 			}
 			
+			if (day == 269964) {
+					Rcout << day << " " << Compartments[CurrentComp].C_CaSO4 << " " << Compartments[CurrentComp].nMoist << endl;
+				}
+
 			//LEACHATE
 			//  examin if we reached saturation
 			if (nLeachate > 0)
@@ -202,6 +223,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 					nTotalLeachate += nLeachate;
 					nWDComp = CurrentComp;
 				}
+
+				
 
 				Compartments[CurrentComp].C_Ca = 0;
 				Compartments[CurrentComp].C_SO4 = 0;
@@ -230,6 +253,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			nRainEvents++;
 			Compartments[nWDComp].nWetCount++;	
 			WD.push_back(day);
+			WD.push_back(nDailyRain);
 			WD.push_back((nWDComp + 0.5)*nthick);
 		
 		}
@@ -246,7 +270,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		floodComp.push_back(it->nFloodedCount);
 		Gypsum.push_back(mol2meqSoil(it->C_CaSO4,thick));
 		moisture.push_back(it->nMoist);
+
+		outputCa += it->C_Ca + it->C_CaSO4;
 	}
+
+	outputCa += nTotalCaLeachate;
 	Rcout << WD.length() << verbose<< endl;
 
 	
@@ -269,7 +297,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		_["AETLoss"] = AETLoss,		
 		_["totalRain"] = nTotalRain,
 		_["CompWash"] = CompWash,
-		_["Leachate"]= nTotalLeachate);
+		_["Leachate"]= nTotalLeachate,
+		_["inputCa"]= inputCa,
+		_["outputCa"]= outputCa);
 
 	return results;
 }
@@ -286,13 +316,13 @@ Rcpp::NumericMatrix CSM::output2Matrix(Rcpp::DoubleVector & inputVector, bool ve
 	{
 		inputVector.attr("dim") = Dimension(20, inputVector.length() / (20));
 		outputMat = transpose(as<NumericMatrix>(inputVector));
-		Rcpp::colnames(outputMat) = CharacterVector::create("day", "rain", "AET", "WD", "soilMoisture", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15");
+		Rcpp::colnames(outputMat) = CharacterVector::create("day", "rain[cm]", "AET", "WD", "soilMoisture", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15");
 	}
 	else
 	{
-		inputVector.attr("dim") = Dimension(2, inputVector.length() / (2));
+		inputVector.attr("dim") = Dimension(3, inputVector.length() / (3));
 		outputMat = transpose(as<NumericMatrix>(inputVector));
-		Rcpp::colnames(outputMat) = CharacterVector::create("day", "WD");
+		Rcpp::colnames(outputMat) = CharacterVector::create("day","rain[cm]", "WD");
 	}
 	Rcout << outputMat.nrow() << " " << outputMat.ncol() << endl;
 	return(outputMat);

@@ -28,9 +28,9 @@ public:
 	double nWhc;					//water holding capacity
 	double nInitTotMoist;
 	double nMoist;				// moisture level
-	double C_Ca;					//soluble Ca ion [mmol]
-	double C_SO4;				//solunle so4 anion [mmol]
-	double C_CaSO4;				//solid gypsum in mmol
+	double C_Ca;					//soluble Ca ion [mol]
+	double C_SO4;				//solunle so4 anion [mol]
+	double C_CaSO4;				//solid gypsum in [mol]
 	double nLastMoist;
 	double nCO2;
 	double nSolubleCa;
