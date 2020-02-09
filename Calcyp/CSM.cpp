@@ -31,41 +31,54 @@ CSM::CSM()
 }
 
 
-vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
- double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor)
+vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years, int Depth, int nthick, double WieltingPoint, int FieldArea,
+	double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4)
 {
-	nNumOfDays = years*365;
+	double nTemp = 25;
+	double nDailyPET = 0;
+	double nDailyAET = 0;
+	double nDailyRain = 0;
+	double DailySO4Rain;
+	double DailyCaRain;
+	double inputCa = 0;
+	double outputCa = 0;
+	int nWDComp = 0;
+	int nRainEvents = 0;
+	int nRainVecLength = rain.size();
+
+	nTotalWhc = 0;
+	nTotalCaDust = 0;
+	nTotalRain = 0;
+	nTotalCaLeachate = 0;
+	nTotalSO4Leachate = 0;
+	nTotalLeachate = 0;
+	nTotalMoist = 0;
+	nTotalAet = 0;
+	nInitMoistTotal = 0;
+	accumolateDustDays = 0.0F;
+
+	nLeachate = 0;
+
+	nNumOfDays= years*365;
 	nDepth = Depth;
 	thick = nthick;	
 	nArea = FieldArea;
 	nNumOfCompatments = nDepth / thick;
 	wieltingPoint = WieltingPoint*thick ;//in cm
-	BulkDensity =nBulkDensity; /// gr/cm^3
 	nFieldCapacity = FieldCapacity*thick;
 	RainArr = rain;
-	// carbonate in dust range from 0.5 to 5 [g m-2 yr-1]. 
-	//I took 0.51 [g m-2 yr-1] = 5.1*10^-5 [g cm-2 yr-1] = 1.4*10^-7 [g cm-2 day-1]
-	// then convert to [mol cm-2 day-1] 
-	nDailyDustCa =  (DustCa / (365.0F*10000.0F)) * 0.02495F; //calcium molar waight 0.02495
-	nDailyDustSO4 = (DustSO4 / (365.0F*10000.0F)) * 0.0104F; //so4 molar waight 0.0104
+
+	// flux is gram/cm2/day multiple by concentration mg/g convert to g/cm2/day convert to mol/cm2/day
+	nDailyDustCa = dustFlux * DustCa / 1000 / 40.078F; //calcium molar waight 40.078
+	nDailyDustSO4 = dustFlux * DustSO4 / 1000 / 96.06F; //so4 molar waight 96.06
 
 	nTotalWhc = (nFieldCapacity - wieltingPoint) * nNumOfCompatments;//in cm
 	nTotalMoist = wieltingPoint * nNumOfCompatments;//[cm]
 	nInitMoistTotal = nTotalMoist;
 	InitCompartments();
-	InitMonths();
 
-	CCa =meqSoil2molar(InitialCa, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
-	CSO4 = meqSoil2molar(initialSO4, nthick*nArea, moistcm2Litre(nInitMoistTotal)); // molar
-	
-	int nMonth;
-	double nTemp;
-	double nDailyPET;
-	double nDailyAET;
-	double nDailyRain;
-	int nWDComp = 0;
-	int nRainEvents = 0;
-	int nRainVecLength = int(RainArr.size());
+	CCa =0; // molar
+	CSO4 = 0; // molar
 	
 	// create list with all compartment
 	vector<double> vect;
@@ -82,12 +95,18 @@ vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years
 	//main loop over days
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
-		nMonth = ((day % 365) / 31);
-		nTemp = 25;
+		if (day == 90299) {
+			cout << day << " " << " " << endl;
+		}
+
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
-		/*nTotalCaDust += nDust;
-		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
+
+		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration
+		DailyCaRain = nDailyRain * 0.001*rainCa / 1000 / 40.078F;// convert cm3 to littre and multiple with concentration
+
+		inputCa += DailyCaRain + nDailyDustCa;
+
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
 			AET = nDailyPET;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
 														//AET=PETdaily[monthperday[day]];
@@ -98,7 +117,6 @@ vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years
 		nTotalMoist = 0;
 		AET *= AETFactor;
 		
-		Months[nMonth].totalAET += AET;
 		nDailyAET = AET;
 		//AET = AET * 10;
 		nTotalAet += nDailyAET;
@@ -108,8 +126,8 @@ vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years
 
 		//accumolate dust and relaese when its raining 
 		if (nDailyRain > 0) {
-			Compartments[0].C_Ca += accumolateDustDays * nDailyDustCa;
-			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4;
+			Compartments[0].C_Ca += accumolateDustDays * nDailyDustCa + DailyCaRain;
+			Compartments[0].C_SO4 += accumolateDustDays * nDailyDustSO4 + DailySO4Rain;
 			accumolateDustDays = 0;
 		}
 		else
@@ -121,56 +139,67 @@ vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years
 		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
 		{
 
-			//  taking into account the AET for this current compartment, and updating the AET value
-			// moist - wieltingPOint is the water available for evaporation
-			if (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt) < AET)
+			//WASHING
+			if (Compartments[CurrentComp].nMoist > (Compartments[CurrentComp].nWhc))
 			{
-				AET = AET - (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt));
-				Compartments[CurrentComp].fAETLoss += Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nThetaWeildingPnt;
-				Compartments[CurrentComp].nMoist = Compartments[CurrentComp].nThetaWeildingPnt;
-			}
-			else
-			{
-				Compartments[CurrentComp].nMoist -= AET; 
-				Compartments[CurrentComp].fAETLoss += AET;
-				AET = 0.0;
-			}
-
-			
-			if (Compartments[CurrentComp].nMoist > (Compartments[CurrentComp].nWhc)) 
-			{				
 				// determines the leachate by substracting the field capacity from the moisture content
 				nLeachate = Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nWhc);
 				Compartments[CurrentComp].nFloodedCount++;
-				nWDComp = CurrentComp+1;
+				nWDComp = CurrentComp + 1;
 			}
 			// in case the comp is floated without leaching
-			else if(Compartments[CurrentComp].nMoist == (Compartments[CurrentComp].nWhc))			{			
-				
+			else if (Compartments[CurrentComp].nMoist == (Compartments[CurrentComp].nWhc)) {
+
 				Compartments[CurrentComp].nFloodedCount++;
-				nLeachate = 0.0;				
+				nLeachate = 0.0;
 			}
 			else
 			{
 				nLeachate = 0.0;
 			}
-			
+
 			Compartments[CurrentComp].fTotLeachate += nLeachate;
 
 			// subtract the leachate from the moisture of the  compartment
-			Compartments[CurrentComp].nMoist -= nLeachate; 
+			Compartments[CurrentComp].nMoist -= nLeachate;
 
+
+			// EVAPORATING
+			//  taking into account the AET for this current compartment, and updating the AET value
+			// moist - wieltingPOint is the water available for evaporation
+			if (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt) < AET)
+			{
+				AET -= (Compartments[CurrentComp].nMoist - (Compartments[CurrentComp].nThetaWeildingPnt));
+				Compartments[CurrentComp].fAETLoss += Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nThetaWeildingPnt;
+				Compartments[CurrentComp].nMoist = Compartments[CurrentComp].nThetaWeildingPnt;
+			}
+			else
+			{
+				Compartments[CurrentComp].nMoist -= AET;
+				Compartments[CurrentComp].fAETLoss += AET;
+				AET = 0.0;
+			}
+
+
+			//CHEMISTRY
 			//calculating gypsum concentration and ion available for washing
 			// only if moist change since yesterday
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
+				
 				Compartments[CurrentComp].solubility(nTemp);
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
+
+				
+
 			}
+
 			
-			//start washing down
+
+			//LEACHATE
 			//  examin if we reached saturation
 			if (nLeachate > 0)
-			{	
+			{
+				
 				//wash to next compartment or to leachete
 				// ion are in mol
 				if (CurrentComp != nNumOfCompatments - 1) {
@@ -186,10 +215,12 @@ vector<double> CSM::Calculate(vector<double> rain, vector<double> PET, int years
 					nWDComp = CurrentComp;
 				}
 
+
+
 				Compartments[CurrentComp].C_Ca = 0;
 				Compartments[CurrentComp].C_SO4 = 0;
 				nLeachate = 0;
-			}		
+			}
 
 			nTotalMoist += Compartments[CurrentComp].nMoist;
 		}
@@ -300,6 +331,7 @@ double CSM::GetPrecision(double x)
 
 void CSM::InitCompartments()
 {
+	Compartments.clear();
 	Compartment *newCompartment;
 	for (int i = 0; i < nNumOfCompatments; i++)
 	{

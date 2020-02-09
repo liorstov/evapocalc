@@ -386,3 +386,6 @@ healthchecksdb
 .Rapp.history
 
 # Session Data files
+/plots/10000newDust.png
+*.png
+*.xlsx

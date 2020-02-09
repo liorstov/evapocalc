@@ -33,8 +33,9 @@ Compartment::~Compartment()
 // The calculation is following Marion et al. (1985) and Hirmas et al. (2010)
 double Compartment::solubility(double temp)
 {
-	double I, A, Ksp, ionActivity, MCa, MSo4, MCaSO4,a_Ca,a_So4,a_CaSo4, // a_* is activity = [Molar * ion activity]
+	double I, A, Ksp,  MCa, MSo4, MCaSO4,a_Ca,a_So4,a_CaSo4, // a_* is activity = [Molar * ion activity]
 		GypOmega, alphaGypsum, a, b, c;
+	float ionActivity;
 	pair<double, double> Quadsolutions;
 
 	//convert to Molar
@@ -79,6 +80,7 @@ double Compartment::solubility(double temp)
 	}
 	else {
 		alphaGypsum = 0;
+		return C_CaSO4 ;
 	}
 
 	//Rcpp::Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;

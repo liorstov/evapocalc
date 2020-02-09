@@ -12,7 +12,7 @@ WG::WG()
 {
 
 	// Open an existing file 
-	ifstream fin("../synthRainS.csv", ios::in);
+	ifstream fin("../DB/synthRainS.csv", ios::in);
 
 	string temp, year;
 	// Read the Data from the file 
@@ -55,6 +55,7 @@ void WG::writeRes(vector<double> res)
 		for (size_t i = 0; i < res.size(); i++)
 		{
 			fout << res[i] << endl;
+			cout << res[i] << endl;
 		}
 		fout.close();
 	}

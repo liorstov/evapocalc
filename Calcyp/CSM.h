@@ -23,8 +23,8 @@ class CSM
 {
 public:
 	CSM();
-	vector<double> Calculate(vector<double>, vector<double>,int years, int Depth, int nthick, double WieltingPoint, double InitialCa,
-						double initialSO4, double nBulkDensity, int FieldArea, double FieldCapacity, double DustCa, double DustSO4, double AETFactor);
+	vector<double> Calculate(vector<double> rain, vector<double> PET, int years, int Depth, int nthick, double WieltingPoint, int FieldArea,
+		double FieldCapacity, double DustCa, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4);
 	std::vector<Compartment>* GetCompartments();
 	double meqSoil2molar(double, double, double moisture);
 	double mol2meqSoil(double, double);
