@@ -49,8 +49,8 @@ remove(con)
 con = odbcConnect("soils")
 
 ##create dataframe from horizons
-dataframe = tbl_df(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1 as ageclass,sites.AvgAge,sites.SoilType, list_desert.DesertID,list_desert.subregion  from horizons,sites,list_desert where (sites.siteid=horizons.siteid) and (sites.DesertID=list_desert.DesertID) and (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
-ages = tbl_df(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age"));
+dataframe = as_tibble(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand,horizons.ColorMunsell,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1 as ageclass,sites.AvgAge,sites.SoilType, list_desert.DesertID,list_desert.subregion  from horizons,sites,list_desert where (sites.siteid=horizons.siteid) and (sites.DesertID=list_desert.DesertID) and (horizons.siteid IN (select sites.siteid from sites where regionid = 94))"));
+ages = as_tibble(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age"));
 dataframe = dataframe %>% full_join(ages,"ageclass")
 dataframe$AvgAge = apply(dataframe[c("ageclass", "AvgAge","min_age","max_age")], 1, function(X) setAge(X[1],X[2],X[3],X[4]))
 
@@ -87,11 +87,11 @@ site(AQPClass) <- ~ subregion
 #slub.structure = horizon thickness cm
 
 caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
-caso4.slab.siteid = slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
+caso4.slab.siteid = slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd)
 caso4.slab.siteid = slab(AQPClass, fm = subregion ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
 
 
-caso4.slab.siteid = merge(caso4.slab.siteid, dataframe[, c("SiteName", "MeanAnnualPrecipitation", "ageclass")], by = "SiteName")
+caso4.slab.siteid = merge(caso4.slab.siteid, dataframe[, c("SiteName", "AvgAge", "ageclass")], by = "SiteName")
 #this is for the strips
 
 #data for plotting 

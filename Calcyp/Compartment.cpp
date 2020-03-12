@@ -79,6 +79,7 @@ double Compartment::solubility(double temp)
 	}
 	else {
 		alphaGypsum = 0;
+		return C_CaSO4;
 	}
 
 	//Rcpp::Rcout << "ag  "<<Quadsolutions.first<< "  " << Quadsolutions.second<< endl;

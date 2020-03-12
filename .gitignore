@@ -386,3 +386,4 @@ healthchecksdb
 # Session Data files
 .RData
 *.png
+*.dat
