@@ -106,7 +106,7 @@ plotSoilResultsAgg = function(res) {
                     scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom") +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
                    geom_bar(stat = "identity", position = "dodge2") +
-                    geom_errorbar(aes(x = depth-1, ymin = min, ymax = max) )
+                    geom_errorbar(aes(x = depth+1, ymin = min, ymax = max) )
    
 
     return(ggarrange(WP1));

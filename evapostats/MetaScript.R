@@ -131,7 +131,7 @@ ggplot(test) + geom_bar(aes(x  = rowid * 70, y = depth, color = Index)) + scale_
 
 #Rain Sulfate---
 ##for zel11
-resultsSulfate = lapply(RainSO4Arr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10000, plotRes = 0, Depth = 50, AETFactor = X, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.0006 / 365, rainCa = 35.58, rainSO4 = X));
+resultsSulfate = lapply(RainSO4Arr, FUN = function(X) CalcGypsum(SynthRainS, duration = 400, plotRes = 0, Depth = 50, AETFactor = X, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.0006 / 365, rainCa = 35.58, rainSO4 = X));
 
 #list of retrun variables (fucking genius)----
 results = resultsSulfate %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
