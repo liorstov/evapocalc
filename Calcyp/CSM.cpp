@@ -132,6 +132,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		else{// in case the soil is at WP, no evaporation
 			AET = 0;
 		}
+		//if (AET == 0 && nDailyRain == 0) continue;
 		//Rcpp::Rcout << nTotalMoist << endl << nTotalWP << endl << nTotalWhc<<endl<<AET<<endl;
 		nTotalMoist = 0;
 		AET *= AETFactor;

@@ -34,16 +34,19 @@ difference <- function(MatrixOC) {
 CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.013,
                          nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1, plotRes = TRUE,
                         verbose = FALSE, dustFlux = 0.0152 / 365, rainCa = 35.58, rainSO4 = 20) {
-
-       tic()
+   
+   require(dplyr)
+  Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+  b <<- new(CSMCLASS);
+    tictoc::tic()
     list =  b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
                    DustGyp, AETFactor, verbose, dustFlux, rainCa, rainSO4);
-    toc()
+    tictoc::toc()
     list$thick = thick;
     #colnames(list$WD) = c("day", "rain", "AET", "WD", "soilMoisture", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20")
     #wd as Tibble
-    DayWD = as_tibble(list$WD);
-    DayGyp = as_tibble(list$gypsumDay);
+    DayWD = dplyr::as_tibble(list$WD);
+    DayGyp = dplyr::as_tibble(list$gypsumDay);
     list$Index30 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.3))),thick = thick);
     list$Index03 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.03))), thick = thick);
     list$WDp80 = round(quantile(DayWD$WD, 0.8),2);
@@ -99,9 +102,13 @@ plotSoilResults = function(res,observed = NULL) {
   # return(ggarrange(WP1, WP2, WP3,WP4,nrow = 2,ncol = 2))
 
 }
-plotSoilResultsAgg = function(res) {
+plotSoilResultsAgg = function(res, obs) {
+    res = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
+            pluck("gypsum")  %>% melt(id.vars = "rowid", value.name = "value") %>% group_by(rowid) %>%
+            dplyr::summarise(min = quantile(value, 0.05), gypsum = mean(value), max = quantile(value, 0.95)) %>% mutate(depth = (rowid - 0.5) * 5) %>%
+            mutate(observed = obs)
 
-    res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", -depth,-min,-max)
+    res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", - depth, - min, - max)
     WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor)) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
                     scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom") +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
@@ -110,9 +117,16 @@ plotSoilResultsAgg = function(res) {
    
 
     return(ggarrange(WP1));
-    # return(ggarrange(WP1, WP2, WP3,WP4,nrow = 2,ncol = 2))
 
 }
+plotSoilResultsRMSD = function(res, obs,CalibArray) {
+    rmsd = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
+    pluck("gypsum") %>% modify(~head(.x, -1)) %>% map_dbl(~rmsd(.x, obs))
+    WP = ggplot(tibble(RainSO4Arr, rmsd), aes(x = CalibArray, y = rmsd)) + geom_line() + geom_point() + scale_x_continuous(breaks = round(unique(CalibArray), 3))
+    return(WP);
+
+}
+
 plotMoisture = function(res,obs) {
 
 

@@ -388,3 +388,4 @@ healthchecksdb
 *.png
 *.dat
 *.jar
+*.rdata
