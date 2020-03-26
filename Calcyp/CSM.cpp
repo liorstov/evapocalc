@@ -102,7 +102,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	Rcpp::DoubleVector floodComp = DoubleVector::create();
 	Rcpp::DoubleVector AETLoss = DoubleVector::create();
 	Rcpp::DoubleVector dayRain = DoubleVector::create();
-	Rcpp::DoubleVector WD = DoubleVector::create();
+	Rcpp::DoubleVector WD (nNumOfDays);
 	Gypsum.erase(0, Gypsum.length());
 	
 	Rcout.precision(10);
@@ -267,14 +267,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			}
 			
 		}
-		else if (nDailyRain > 0 )
+		else if (nDailyRain > 0)
 		{
 			nRainEvents++;
-			Compartments[nWDComp].nWetCount++;	
-			WD.push_back(day);
-			WD.push_back(nDailyRain);
-			WD.push_back((nWDComp + 0.5)*nthick);
-		
+			Compartments[nWDComp].nWetCount++;				
+			WD[day]=((nWDComp + 0.5)*nthick);		
 		}
 		
 		nWDComp = 0;
@@ -317,7 +314,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	results = Rcpp::List::create(_["gypsum"] = Gypsum, _["gypsumDay"] = output2Matrix(GypsumDay, verbose),
 		_["Ca"] = Ca,
 		_["SO4"] = SO4,
-		_["WD"] = output2Matrix(WD, verbose),
+		_["WD"] = WD,
 		_["moist"] = moisture,
 		_["WetZone"] = floodComp,
 		_["AET"] = nTotalAet,

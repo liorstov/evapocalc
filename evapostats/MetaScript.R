@@ -79,14 +79,6 @@ gc(reset = TRUE)
 
 
 
-FCarray = seq(0.02, 0.3, by = 0.01);
-RainSO4Arr = seq(1, 20, length = 5);
-wiltingPointArray = seq(0.01, 0.02,length = 10);
-DustFluxArray = seq(from = 0.1,to =  3, length = 20);
-AETArray = seq(from = 0.1, to = 2, length = 10);
-RainFactorArray = seq(from = 0.05, to = 0.9, length = 2);
-initIonArray = seq(from = 1, to = 20, length = 45);
-AetRainComb =  as.matrix(crossing(RainFactorArray, AETArray))
 
 
 
@@ -134,22 +126,38 @@ observedProfiles = read_csv("DB\\Calcyp_GypsoilHorizons_caso4.slab.csv") %>% dpl
 Zel11Observed = observedProfiles %>% filter(str_detect(SiteName, "11")) 
 Zel12Observed = observedProfiles %>% filter(str_detect(SiteName, "12")) 
 T1.9Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
+T1.10Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
+
+FCarray = seq(0.02, 0.3, by = 0.01);
+RainArr = seq(0, 40, length = 50);
+DustArr = seq(from = 0, to = 7, length = 50);
+rainDustArray = as.matrix(crossing(RainArr, DustArr))
+
 ##for zel11
-resultsSulfateZel11 = lapply(RainSO4Arr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), AETFactor = 1.2, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.000504 / 365, rainCa = 35.58, rainSO4 = X));
-resultsSulfateZel12 = lapply(RainSO4Arr, FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), AETFactor = 1.2, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.000663 / 365, rainCa = 35.58, rainSO4 = X));
-resultsSulfateT1.9 = lapply(RainSO4Arr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom,1), AETFactor = 1.2, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.0002 / 365, rainCa = 35.58, rainSO4 = X));
+resultsRainZel11 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = 2.59,  rainSO4 = X));
+resultsDustZel11 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = X,  rainSO4 = 12));
+resultsRainZel12 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), dustFlux = 5.04,  rainSO4 = X));
+resultsDustZel12 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1),  dustFlux = X,  rainSO4 = 12));
+resultsRainT1.9 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1),  dustFlux = 5.08, rainSO4 = X));
+resultsDustT1.9 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1),  dustFlux = X,rainSO4 = 12));
+resultsRainT1.10 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = 0.74,  rainSO4 = X));
+resultsDustT1.10 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = X,  rainSO4 = 12));
+
+resultsDustT1.10 = lapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainCa = 35.58, rainSO4 = rainDustArray[X, 1]));
 
 #list of retrun variables (fucking genius)----
-plotSoilResultsAgg(resultsSulfateZel12, c(Zel12Observed %>% pull(mean)))
+plotSoilResultsAgg(resultsSulfateT1.10[1], c(T1.10Observed %>% pull(mean)))
 
 #rmsd as compared to observed
-plotSoilResultsRMSD(resultsSulfateZel12, c(Zel12Observed %>% pull(mean)), RainSO4Arr)
+bla = plotSoilResultsRMSD(resultsSulfateT1.10, c(T1.10Observed %>% pull(mean)), RainArr)
+bla = plotSoilResultsRMSD(resultsSulfateT1.10, c(T1.10Observed %>% pull(mean)), DustArr)
 
-registerDoFuture()
+
+blaregisterDoFuture()
 plan(multiprocess)
 cl = makeCluster(2)
 plan(cluster, workers = makeCluster(2))
-resultsSulfateZel12test = foreach(i = RainSO4Arr, .export = c( "b", "CSMCLASS"), .noexport = c("SynthRainS", "SynthRain"), .packages = c("tictoc", "dplyr", "Rcpp")) %dopar% {
+resultsSulfateZel12test = foreach(i = RainArr, .export = c( "b", "CSMCLASS"), .noexport = c("SynthRainS", "SynthRain"), .packages = c("tictoc", "dplyr", "Rcpp")) %dopar% {
      CalcGypsum(SynthRainS, duration = 50, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), AETFactor = 1.2, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.000663 / 365, rainCa = 35.58, rainSO4 = i)
 }
 
@@ -170,7 +178,7 @@ combi = results;
 results = sapply(initIonArray, FUN = function(X) CalcGypsum(years = 10000, DustCa = 2, DustSO4 = 2, AETFactor = 90, InitialCa = X, initialSO4 = X, observedArray = (Observed$zeelim.2EH)));
 
 #running differrent flux
-results = sapply(DustFluxArray, FUN = function(X) CalcGypsum(years = 10000, DustCa = X, DustSO4 = X, observedArray = (Observed$zeelim.2EH)));
+results = sapply(DustArr, FUN = function(X) CalcGypsum(years = 10000, DustCa = X, DustSO4 = X, observedArray = (Observed$zeelim.2EH)));
 
 
 #running differrent WP

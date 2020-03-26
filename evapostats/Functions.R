@@ -32,21 +32,23 @@ difference <- function(MatrixOC) {
 }
 
 CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.013,
-                         nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1, plotRes = TRUE,
-                        verbose = FALSE, dustFlux = 0.0152 / 365, rainCa = 35.58, rainSO4 = 20) {
-   
-   require(dplyr)
-  Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-  b <<- new(CSMCLASS);
+                         nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1.16, plotRes = TRUE,
+                        verbose = FALSE,  rainCa = 35.58,dustFlux,rainSO4) {
+
+
+   #require(dplyr)
+  #Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+  #b <<- new(CSMCLASS);
     tictoc::tic()
     list =  b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
-                   DustGyp, AETFactor, verbose, dustFlux, rainCa, rainSO4);
+                   DustGyp, AETFactor, verbose, dustFlux/10000/365, rainCa, rainSO4);
     tictoc::toc()
     list$thick = thick;
+    
     #colnames(list$WD) = c("day", "rain", "AET", "WD", "soilMoisture", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20")
     #wd as Tibble
-    DayWD = dplyr::as_tibble(list$WD);
-    DayGyp = dplyr::as_tibble(list$gypsumDay);
+   
+    DayWD = dplyr::as_tibble(list$WD) %>% rowid_to_column(var = "day") %>% mutate(WD=value)
     list$Index30 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.3))),thick = thick);
     list$Index03 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.03))), thick = thick);
     list$WDp80 = round(quantile(DayWD$WD, 0.8),2);
@@ -58,6 +60,9 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
     list$SWDp80 = round(quantile(Seasonal$WD, 0.8),2);
   
     list$WD = DayWD %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
+    list$maxWD = max(DayWD$WD);
+    
+    DayGyp = dplyr::as_tibble(list$gypsumDay);
     list$gypsumDay = DayGyp %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
     list$waterBalance = list$totalRain - sum(list$AETLoss);
     list$duration = duration;
@@ -67,7 +72,7 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
     list$DGyp = DustGyp;
     list$RCa = rainCa;
     list$RSO4 = rainSO4;
-    list$maxWD = max(DayWD$WD);
+    
 
     if (plotRes) {
             plotSoilResults(list);
@@ -103,28 +108,38 @@ plotSoilResults = function(res,observed = NULL) {
 
 }
 plotSoilResultsAgg = function(res, obs) {
+    SWDp80 = res[[1]]$SWDp80
     res = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
-            pluck("gypsum")  %>% melt(id.vars = "rowid", value.name = "value") %>% group_by(rowid) %>%
-            dplyr::summarise(min = quantile(value, 0.05), gypsum = mean(value), max = quantile(value, 0.95)) %>% mutate(depth = (rowid - 0.5) * 5) %>%
+            pluck("gypsum") %>% melt(id.vars = "rowid", value.name = "value") %>% group_by(rowid) %>%
+            dplyr::summarise(min = quantile(value, 0.05), gypsum = mean(value), max = quantile(value, 0.95)) %>% mutate(depth = (rowid - 0.5) * res[[1]]$thick) %>%
             mutate(observed = obs)
-
+    
     res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", - depth, - min, - max)
     WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor)) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
                     scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom") +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
                    geom_bar(stat = "identity", position = "dodge2") +
-                    geom_errorbar(aes(x = depth+1, ymin = min, ymax = max) )
+                    geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +
+                    geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80 = ", SWDp80)))
    
 
     return(ggarrange(WP1));
 
 }
 plotSoilResultsRMSD = function(res, obs,CalibArray) {
-    rmsd = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
-    pluck("gypsum") %>% modify(~head(.x, -1)) %>% map_dbl(~rmsd(.x, obs))
-    WP = ggplot(tibble(RainSO4Arr, rmsd), aes(x = CalibArray, y = rmsd)) + geom_line() + geom_point() + scale_x_continuous(breaks = round(unique(CalibArray), 3))
-    return(WP);
+    rmsdTable = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
+    pluck("gypsum")  %>% map_dbl(.f = ~rmsd(.x, obs)) %>% as_tibble() %>% add_column(CalibArray)
+    WP = ggplot(rmsdTable, aes(x = CalibArray, y = value)) + geom_line() + geom_point() + scale_x_continuous(breaks = round(unique(CalibArray), 3))
+    print(WP)
+    return(rmsdTable);
 
+}
+
+plotSoilResultsSurface = function(res, obs, CalibArray) {
+    rmsdTable = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
+    pluck("gypsum") %>% map_dbl(.f = ~rmsd(.x, obs)) %>% as_tibble() %>% add_column(x = CalibArray[, 1], y = CalibArray[, 2])
+
+    ggplot(rmsdTable, aes(x = x, y = y, z = value)) + geom_raster(aes(fill = value)) + scale_fill_gradient(low = "red", high = "lightgreen") + geom_point() + geom_contour()
 }
 
 plotMoisture = function(res,obs) {
