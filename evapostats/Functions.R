@@ -21,24 +21,22 @@ rmsd <- function(observed,measured) {
     sqrt(sum((observed-measured) ^ 2)/length(observed))
 }
 
-difference <- function(MatrixOC) {
-    depthofMaxValue = round(mean(which(max(MatrixOC[, 2], na.rm = TRUE) == MatrixOC[, 2]), na.rm = TRUE)) * 5;
-    depthofMaxValueObserved = round(mean(which(max(MatrixOC[, 1], na.rm = TRUE) == MatrixOC[, 1]), na.rm = TRUE)) * 5;
-    if (depthofMaxValue == 5) {
-        depthofMaxValue = NA;
-    }
-    #print(depthofMaxValueObserved - depthofMaxValue)
-    return((depthofMaxValueObserved - depthofMaxValue));
+difference <- function(observed, measured) {
+    sum((observed - measured) ^ 2) 
 }
 
 CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.013,
                          nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1.16, plotRes = TRUE,
-                        verbose = FALSE,  rainCa = 35.58,dustFlux,rainSO4) {
+                        verbose = FALSE, rainCa = 35.58, dustFlux, rainSO4, Random = TRUE, obs = NULL) {
 
 
-   #require(dplyr)
-  #Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-  #b <<- new(CSMCLASS);
+    #require(dplyr)
+    #Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+    #b <<- new(CSMCLASS);
+    if (Random) {
+        randomYears = sample(unique(raindata$year), duration)
+        raindata = raindata %>% filter(year %in% randomYears)
+    }
     tictoc::tic()
     list =  b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
                    DustGyp, AETFactor, verbose, dustFlux/10000/365, rainCa, rainSO4);
@@ -72,8 +70,11 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
     list$DGyp = DustGyp;
     list$RCa = rainCa;
     list$RSO4 = rainSO4;
-    
+    list$WD = NULL;
 
+    if (is.null(obs)) {
+        list$rmsd = rmsd(obs, list$gypsum)
+    }
     if (plotRes) {
             plotSoilResults(list);
     }
@@ -120,7 +121,8 @@ plotSoilResultsAgg = function(res, obs) {
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
                    geom_bar(stat = "identity", position = "dodge2") +
                     geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +
-                    geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80 = ", SWDp80)))
+                    geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80 = ", SWDp80))) + theme(legend.title = element_blank()) 
+
    
 
     return(ggarrange(WP1));
@@ -129,17 +131,27 @@ plotSoilResultsAgg = function(res, obs) {
 plotSoilResultsRMSD = function(res, obs,CalibArray) {
     rmsdTable = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
     pluck("gypsum")  %>% map_dbl(.f = ~rmsd(.x, obs)) %>% as_tibble() %>% add_column(CalibArray)
-    WP = ggplot(rmsdTable, aes(x = CalibArray, y = value)) + geom_line() + geom_point() + scale_x_continuous(breaks = round(unique(CalibArray), 3))
+    WP <<- ggplot(rmsdTable, aes(x = CalibArray, y = value)) + geom_line() + geom_point() + ggtitle(paste("cor = ", cor(rmsdTable$CalibArray, rmsdTable$value)))
     print(WP)
     return(rmsdTable);
 
 }
 
+#return not rmsd but difference netween obs abd res
+plotSoilResultsMean = function(res, obs, CalibArray) {
+ 
+    rmsdTable = res %>% transpose %>%  pluck("gypsum") %>% map_dbl(.f = ~(difference(.x, obs))) %>% as_tibble() %>% add_column(rain = CalibArray[, 1], dust = CalibArray[, 2],n = length(obs)) %>% nest(value= c(value,n))
+
+    return(rmsdTable)
+
+}
+
 plotSoilResultsSurface = function(res, obs, CalibArray) {
     rmsdTable = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
-    pluck("gypsum") %>% map_dbl(.f = ~rmsd(.x, obs)) %>% as_tibble() %>% add_column(x = CalibArray[, 1], y = CalibArray[, 2])
+    pluck("gypsum") %>% map_dbl(.f = ~rmsd(.x, obs)) %>% enframe() %>% add_column(rain = CalibArray[, 1], dust = CalibArray[, 2])
 
-    ggplot(rmsdTable, aes(x = x, y = y, z = value)) + geom_raster(aes(fill = value)) + scale_fill_gradient(low = "red", high = "lightgreen") + geom_point() + geom_contour()
+   print( ggplot(rmsdTable, aes(x = rain, y = dust, z = value)) +geom_raster(aes(fill = value))+  geom_contour()  + labs(x = "rain [ml/l]", y = "dust flux [g/m2/yr]", title = "",fill = "RMSD [meq/100g soil]"))
+   return(rmsdTable)
 }
 
 plotMoisture = function(res,obs) {
@@ -195,3 +207,9 @@ RawData2Compartments <- function(data, compartmentThick) {
     ddply(data, .(compartment), numcolwise(function(x) sum(x * 0.5 / compartmentThick) ))
     
 }
+
+meanRMSD = function(results) {
+    results = results ^ 2;
+    return(sqrt(mean(results)));
+}
+

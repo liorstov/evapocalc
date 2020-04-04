@@ -1,5 +1,5 @@
 
-load("C:/Users/liorst/Source/Repos/evapocalc/test.RData")
+load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
 require(tidyverse)
 require(Rcpp)
 require(ggplot2)
@@ -8,9 +8,10 @@ require(zoo)
 require(tictoc)
 require(R.matlab)
 require(gganimate)
+require(pbapply)
 
 
-theme_set(theme_classic() + theme(legend.title = element_blank(), legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
+theme_set(theme_classic() + theme( legend.key.size = unit(2, "picas"), legend.text = element_text(size = 15),
 axis.text.x = element_text(size = 20, angle = 43,hjust = 1),
 axis.text.y = element_text(size = 25),
 axis.title.y = element_text(size = 20),
@@ -26,6 +27,9 @@ setwd("C:/Users/liorst/source/repos/evapocalc");
 source("evapostats/Functions.R");
 source("evapostats/PETGen.R");
 source("evapostats/RainGen.R");
+Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+b <<- new(CSMCLASS);
+
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
@@ -46,11 +50,9 @@ print(results);
 dev.off()
 
 
-Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-b <<- new(CSMCLASS);
 
 duration = 1000
-result = CalcGypsum(SynthRainS %>% filter(year>5000), duration, plotRes = 0, Depth = 50, AETFactor =1, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux =6.52/10000 / 365, DustGyp = 0.005, rainCa = 35, rainSO4 =15);
+result = CalcGypsum(SynthRainS, duration, plotRes = 1, Depth = 50, AETFactor =1, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux =6.52/10000 / 365, DustGyp = 0.005, rainCa = 35, rainSO4 =15);
 plotSoilResults(result)
 
 
@@ -125,41 +127,102 @@ ggplot(test) + geom_bar(aes(x  = rowid * 70, y = depth, color = Index)) + scale_
 observedProfiles = read_csv("DB\\Calcyp_GypsoilHorizons_caso4.slab.csv") %>% dplyr::select(1:12) %>% drop_na()
 Zel11Observed = observedProfiles %>% filter(str_detect(SiteName, "11")) 
 Zel12Observed = observedProfiles %>% filter(str_detect(SiteName, "12")) 
+Zel13Observed = observedProfiles %>% filter(str_detect(SiteName, "13")) 
 T1.9Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
 T1.10Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
 
 FCarray = seq(0.02, 0.3, by = 0.01);
-RainArr = seq(0, 40, length = 50);
-DustArr = seq(from = 0, to = 7, length = 50);
+RainArr = c(seq(0, 11.96, length = 5), seq(11.97, 14.63, length = 10), seq(14.64, 25, length = 5));
+DustArr = c(seq(0, 1.16, length = 5), seq(1.17,1.43, length = 10), seq(1.44, 7, length = 5));
 rainDustArray = as.matrix(crossing(RainArr, DustArr))
 
 ##for zel11
-resultsRainZel11 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = 2.59,  rainSO4 = X));
-resultsDustZel11 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = X,  rainSO4 = 12));
-resultsRainZel12 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), dustFlux = 5.04,  rainSO4 = X));
-resultsDustZel12 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1),  dustFlux = X,  rainSO4 = 12));
-resultsRainT1.9 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1),  dustFlux = 5.08, rainSO4 = X));
-resultsDustT1.9 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1),  dustFlux = X,rainSO4 = 12));
-resultsRainT1.10 = lapply(RainArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = 0.74,  rainSO4 = X));
-resultsDustT1.10 = lapply(DustArr, FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = X,  rainSO4 = 12));
 
-resultsDustT1.10 = lapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainCa = 35.58, rainSO4 = rainDustArray[X, 1]));
-
+resultsDustT1.10 = pblapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+resultsDustT1.9 = pblapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+resultsRainZel11 = pblapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+resultsDustZel12 = pblapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainS, duration = 8900, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+resultsDustZel13 = pblapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainS, duration = 2800, plotRes = 0, Depth = tail(Zel13Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+save.image(file = "test.RData")
 #list of retrun variables (fucking genius)----
-plotSoilResultsAgg(resultsSulfateT1.10[1], c(T1.10Observed %>% pull(mean)))
+selectRes =  as_tibble(rainDustArray) %>% rowid_to_column %>% filter(RainArr == RMSDRain.T.10$rain[67]) %>% pull(rowid)
+plotSoilResultsAgg(resultsDustT1.10[67], c(T1.10Observed %>% pull(mean)))
+plotSoilResultsAgg(resultsDustT1.9[74], c(T1.9Observed %>% pull(mean)))
+plotSoilResultsAgg(resultsRainZel11[77], c(Zel11Observed %>% pull(mean)))
+plotSoilResultsAgg(resultsDustZel12[31], c(Zel12Observed %>% pull(mean)))
 
+RMSDRain.T.10 = plotSoilResultsMean(resultsDustT1.10, c(T1.10Observed %>% pull(mean)), rainDustArray) %>% rename(T1.10 = value)
+RMSDRain.T1.9 = plotSoilResultsMean(resultsDustT1.9, c(T1.9Observed %>% pull(mean)), rainDustArray) %>% rename(T1.9 = value)
+RMSDRain.Zel11 = plotSoilResultsMean(resultsRainZel11, c(Zel11Observed %>% pull(mean)), rainDustArray) %>% rename(zel11 = value)
+RMSDRain.Zel12 = plotSoilResultsMean(resultsDustZel12, c(Zel12Observed %>% pull(mean)), rainDustArray) %>% rename(zel12 = value)
+RMSDRain.Zel13 = plotSoilResultsMean(resultsDustZel13, c(Zel13Observed %>% pull(mean)), rainDustArray) %>% rename(zel13 = value)
 #rmsd as compared to observed
-bla = plotSoilResultsRMSD(resultsSulfateT1.10, c(T1.10Observed %>% pull(mean)), RainArr)
+RMSDRain.T.10 = plotSoilResultsMean(resultsRainT.10, c(T1.10Observed %>% pull(mean)), RainArr) 
+RMSDRain.T1.9 = plotSoilResultsMean(resultsRainT1.9, c(T1.9Observed %>% pull(mean)), RainArr)
+RMSDRain.Zel11 = plotSoilResultsMean(resultsRainZel11, c(Zel11Observed %>% pull(mean)), RainArr)
+RMSDRain.Zel12 = plotSoilResultsMean(resultsRainZel12, c(Zel12Observed %>% pull(mean)), RainArr)
+bla = plotSoilResultsRMSD(resultsRainZel11Const, c(Zel11Observed %>% pull(mean)), RainArr)
+bla = plotSoilResultsRMSD(resultsDustZel12, c(Zel12Observed %>% pull(mean)), DustArr)
+bla = plotSoilResultsRMSD(resultsRainZel12Const, c(Zel12Observed %>% pull(mean)), RainArr)
+bla = plotSoilResultsRMSD(resultsDustZel11, c(Zel11Observed %>% pull(mean)), DustArr)
+bla = plotSoilResultsRMSD(resultsDustZel11Const, c(Zel11Observed %>% pull(mean)), DustArr)
+bla = plotSoilResultsRMSD(resultsDustZel12Const, c(Zel12Observed %>% pull(mean)), DustArr)
 bla = plotSoilResultsRMSD(resultsSulfateT1.10, c(T1.10Observed %>% pull(mean)), DustArr)
+RMSDRain.T.10[which.min(bla1$),]
 
+#combine results of rmsd
+bla1 = RMSDRain.T.10 %>%    filter(dust == RMSDRain.T.10$dust[67]) %>% dplyr::select(-dust, T1.10 = value) #0.74
+bla2 = RMSDRain.T1.9 %>%    filter(dust == RMSDRain.T1.9$dust[74]) %>% dplyr::select(-dust, T1.9 = value) #5.08
+bla3 = RMSDRain.Zel11 %>%   filter(dust == RMSDRain.Zel11$dust[77]) %>% dplyr::select(-dust, Zel11 = value) #2.59
+bla4 = RMSDRain.Zel12 %>%   filter(dust == RMSDRain.Zel12$dust[31]) %>% dplyr::select(-dust, Zel12 = value) #5.04
+bla5 = RMSDRain.Zel13 %>%   filter(dust == RMSDRain.Zel13$dust[43]) %>% dplyr::select(-dust, Zel13 = value) #5.04
 
-blaregisterDoFuture()
-plan(multiprocess)
-cl = makeCluster(2)
-plan(cluster, workers = makeCluster(2))
-resultsSulfateZel12test = foreach(i = RainArr, .export = c( "b", "CSMCLASS"), .noexport = c("SynthRainS", "SynthRain"), .packages = c("tictoc", "dplyr", "Rcpp")) %dopar% {
-     CalcGypsum(SynthRainS, duration = 50, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), AETFactor = 1.2, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 0.000663 / 365, rainCa = 35.58, rainSO4 = i)
+rmsdTable = bla1 %>% left_join(bla2, by = "rain") %>% left_join(bla3, by = "rain") %>% left_join(bla4, by = "rain") %>% left_join(bla5, by = "rain") %>% mutate(zel = sqrt((Zel11 ^ 2 + Zel12 ^ 2 + Zel13 ^ 2) / 3), SH = sqrt((T1.9 ^ 2 + T1.10 ^ 2) / 2)) %>% gather("factor", "value", - rain) # 
+ggplot(rmsdTable %>% filter(factor %in% c("zel","SH")), aes(x = rain, y = value, color = factor)) + geom_line() + geom_point() +
+                labs(x = "SO4 in rain [ml/L]", y = "RMSD meq/100g soil", color = "profile", title = "sulfate in rain using optimal dust flux")
+ggplot(rmsdTable, aes(x = rain, y = value, color = factor)) + geom_line() + geom_point() +
+                labs(x = "SO4 in rain [ml/L]", y = "RMSD meq/100g soil", color = "profile", title = "sulfate in rain using optimal dust flux")
+
+#cross validation
+CV = RMSDRain.T.10 %>% left_join(RMSDRain.T1.9, by = c("rain", "dust")) %>% left_join(RMSDRain.Zel11, by = c("rain", "dust")) %>% left_join(RMSDRain.Zel12, by = c("rain", "dust")) %>% left_join(RMSDRain.Zel13, by = c("rain", "dust")) %>%
+            gather("factor", "value", - rain, - dust) %>% unnest() %>% mutate(RMSD = sqrt((value) / (n)))
+
+resCV = tibble(name = numeric(), val = numeric(), dust = numeric(), rain = numeric())
+for (item in unique(CV$factor)) {
+    temp = CV %>% filter(factor != item) %>% group_by(rain, dust) %>% summarise(RMSD = sqrt(sum(value) / sum(n)))
+    temp = temp %>% arrange(RMSD) %>% head(1) 
+
+    res = CV %>% filter(factor == item, dust == temp$dust, rain == temp$rain)
+    resCV = resCV %>% add_row(name = item, val = res$RMSD, dust = res$dust,rain = res$rain)
+
 }
+    {
+
+        
+
+}
+CV %>% group_by(rain, dust) %>% summarise(sqrt(sum(value) / sum(n)))
+
+
+#i = 0;
+#for (item in 3:ncol(CV)) { i = i+1
+    #headline = CV %>% mutate(s = sqrt(rowSums(.[, c(-1, -2, - as.integer(item))]) / (CVn %>% mutate(den = rowSums(.[, c(-1, -2, - as.integer(item))])) %>% pull(den)))) %>%
+            #arrange(s) %>% head(1)
+    #CVRes[i] = (sqrt(headline %>% pull(item) / CVn[1, item]))
+#}
+
+blak2 = RMSDRain.T1.9 %>% filter(rain == RMSDRain.T1.9$rain[74]) %>% dplyr::select(-rain, T1.9 = value) #5.08
+blak3 = RMSDRain.Zel11 %>% filter(rain == RMSDRain.Zel11$rain[77]) %>% dplyr::select(-rain, Zel11 = value) #2.59
+blak4 = RMSDRain.Zel12 %>% filter(rain == RMSDRain.Zel12$rain[31]) %>% dplyr::select(-rain, Zel12 = value) #5.04
+
+rmsdTable = blak1 %>% left_join(blak2, by = "dust") %>% left_join(blak3, by = "dust") %>% left_join(blak4, by = "dust") %>% gather("factor", "value", - dust) #%>% mutate(value = sqrt((value.x ^ 2 + value.y ^ 2) / 2)) 
+ggplot(rmsdTable, aes(x = dust, y = value, color = factor)) + geom_line() + geom_point() +
+                labs(x = "dust flux [g/m2/year]", y = "RMSD meq/100g soil", color = "profile", title = "dust flux usin optimal rain")
+
+
+ggplot(blak1, aes(x = dust, y = T1.10)) + geom_line() + geom_point() +    labs(x = "dust flux [g/m2/year]", y = "RMSD meq/100g soil")
+
+
 
 #aetsENSITIVITY---
 ggplot(tibble(meanWD = results$meanWD$value, Index30 = results$Index30$value, WDp80 = results$WDp80$value, FC = FCarray)) +
@@ -170,128 +233,4 @@ ggplot(tibble(meanWD = results$meanWD$value, Index30 = results$Index30$value, WD
 
 
 ggplot(bla, aes(value, group = L1)) + stat_ecdf(aes(color = factor(L1))) + coord_flip(c(0,10)) + scale_x_reverse() + scale_y_reverse()
-
-#running FLUX AET combination
-results = sapply(seq(1, nrow(AetRainComb)), FUN = function(X) CalcGypsum(years = 1000, RainFactor = AetRainComb[X, 1], AETFactor = AetRainComb[X, 2], observedArray = (Observed$zeelim.2EH)));
-combi = results;
-#running differrent inition
-results = sapply(initIonArray, FUN = function(X) CalcGypsum(years = 10000, DustCa = 2, DustSO4 = 2, AETFactor = 90, InitialCa = X, initialSO4 = X, observedArray = (Observed$zeelim.2EH)));
-
-#running differrent flux
-results = sapply(DustArr, FUN = function(X) CalcGypsum(years = 10000, DustCa = X, DustSO4 = X, observedArray = (Observed$zeelim.2EH)));
-
-
-#running differrent WP
-results = sapply(wiltingPointArray, FUN = function(X) CalcGypsum(years = 10000, DustCa = 2, DustSO4 = 2, AETFactor = 90, wieltingPoint = X, observedArray = (Observed$zeelim.2EH)));
-
-#evapotranspiration
-results = sapply(AETArray, FUN = function(X) CalcGypsum(years = 10000, AETFactor = X, Depth = 200, Getresults = FALSE, observedArray = (Observed$zeelim.2EH)));
-
-#rain
-results = sapply(RainFactorArray, FUN = function(X) CalcGypsum(years = 1000, RainFactor = X, Depth = 100, observedArray = (Observed$zeelim.2EH), raindata= EilatData$depth, PETData = EilatData$PET));
-
-#tests
-CalcGypsum(duration = 10000, RainFactor = 1, Depth = 200, observedArray = (Observed$shehoret1.MP), raindata = as.numeric(EilatData$depth), PETData = EilatData$PET, Getresults = TRUE, AETFactor = 1);
-
-Observed$Calculated = obsCalc[, 2]
-Observed[21:40,] = NA;
-
-#convert to plotable
-results = as.data.frame.array(t(results))
-for (I in seq(1:ncol(results))) {
-    results[, I] = unlist(results[I]);
-}
-
-ggplot(data = results, mapping = aes(x = results$DustCa, y = results$AETFactor, y = results$difference.observedArray.)) + geom_density();
-
-#sesitivity test for InitIon
-dustplot = ggplot(data = results) + geom_smooth(se = FALSE, mapping = aes(x = results$wieltingPoint, y = results$difference.observedArray.)) +
-    labs(x = "Wilting Point [cm2]", y = "Gypsum accumulation depth difference [cm]",
-    title = "sensitivity test for soil Initial soluble ions") + theme(text = element_text(size = 15));
-
-#sesitivity test for WP
-dustplot = ggplot(data = results) + geom_smooth(se = FALSE, mapping = aes(x = results$wieltingPoint, y = results$difference.observedArray.)) +
-    labs(x = "Wilting Point [cm2]", y = "Gypsum accumulation depth difference [cm]",
-    title = "sensitivity test for soil WiltingPoint") + theme(text = element_text(size = 15));
-
-
-#sesitivity test for flux
-dustplot = ggplot(data = results, mapping = aes(x = results$DustCa, y = results$difference.observedArray.)) + geom_point() + geom_path() +
-   xlim (0,2.01)+
-    labs(x = "yearly dust flux [g/m-2/yr-1]", y ="Gypsum accumulation depth difference [cm]",
-    title = "sensitivity test for dust flux") + theme(text = element_text(size = 15, face = "bold"));
-
-ggsave("plots/measuredOnly.png" )
-
-#sensitivity test for AESFactor
-ETPlot = ggplot(data = results, mapping = aes(x = results$AETFactor, y = results$difference.observedArray.)) + geom_point(se = FALSE) +
-    labs(x = "Evapotranspiration Factor", y = "Gypsum accumulation depth difference [cm]",
-    title = "sensitivity test for Evapotranspiration") + theme(text = element_text(size = 15, face = "bold")) + geom_path();
-
-#sensitivity test for rain factor
-ETPlot = ggplot(data = results, mapping = aes(x = results$RainFactor, y = results$difference.observedArray.)) + geom_point() +
-    geom_point(mapping = aes(y = results$difference.observedArray.[7], x = results$RainFactor[7]), color = 'red', size = 2) +
-    labs(x = "Rain Depth Factor", y = "Gypsum accumulation depth difference [cm]",
-    title = "sensitivity test for Rain Factor \n AETFactor = 4.8; DustFlux = 1.5 g/m yr") +
-    theme(text = element_text(size = 15), legend.text = element_text(size = 15, face = "bold")) + geom_path();
-
-
-#response surfece
-ggplot(results, aes(x = results$RainFactor, y = results$AETFactor, z = results$difference.observedArray)) +
-    geom_raster(aes(fill = results$difference.observedArray), interpolate = TRUE, contour = TRUE) + geom_contour(color = "white") +    
-    labs(x = "Rain Depth Factor", y = "Evaporation Factor", fill = "Gypsum accumulation\ndepth difference [cm]\n",
-    title = "Response Surface for rain and evaporation factor") + theme(text = element_text(size = 15), legend.text = element_text(size = 12)) 
-
-monthDF = as.data.frame(monthAET);
-monthDF$month = factor(month.abb, levels = month.abb)
-ggplot(data = monthDF, aes(x = month, y = monthAET)) + geom_bar(stat = "identity") +
-    labs(y = "Average monthly AET [cm]", x = "" , title = "Average monthly AET for 10 ka" )
-
-#plor gypsum profile
-melted = melt(Observed, id.vars = "depth_roof")
-melted$lineType = "solid";
-melted$lineType[which(melted$variable == "Calculated")] = "dashed";
-ggplot(data = melted[which(melted$variable %in% c( "shehoret1.MP", "shehoret3.MP", "zeelim.12H", "zeelim.13H", "zeelim.11MH" ,"zeelim.2EH", "zeelim.1EH")),],
-    mapping = aes(x = value, y = depth_roof,, group = variable, colour = variable, linetype = lineType)) + geom_path() + scale_y_reverse() +
-    labs(x = "Gypsum [meq/100 gr soil]", y = "Depth [cm]", colour = "Site name", title = "Measured Data") +
-    scale_linetype_manual(values = c("solid", "solid")) + guides(linetype = FALSE) + theme(text = element_text(size = 20));
-
-
-#"zeelim.12H", "zeelim.13H", "zeelim.11MH" ,"zeelim.2EH", "zeelim.1EH", "Calculated"
-
-#find minimum value
-minimal = temp[3, temp[1,] == min(unlist(temp[1,]))]
-
-##create for Eilta
-EilatData = read.csv("Eilat.csv",);
-
-##get amount values 
-EilatAmountCdf = ecdf(SedomData[,3]);
-
-##Interval 
-#EilatInterval = tail(EilatData$time, -1) - head(EilatData$time, -1);
-#EilatInterval = EilatInterval[which(EilatInterval < 180)];
-
-##get interval CDF
-#EilatIntervalCDF = ecdf(EilatInterval);
-#Intervalcdf = cbind(get("x", environment(EilatIntervalCDF)), get("y", environment(EilatIntervalCDF)));
-
-##get CDF function
-Amountcdf = cbind(get("x", environment(EilatAmountCdf)), get("y", environment(EilatAmountCdf)));
-test = as.data.frame.array(Amountcdf);
-ggplot(test, aes(x = test$V1)) + stat_ecdf(geom = "point") + labs(x = "Event magnitude [mm]", title = "ecdf for Sodom station") + theme(text = element_text(size = 30))
-
-test
-
-
-##generate Rain series
-
-#RainSeries = numeric(NumberOfYears * 365);
-#interval = 0;
-#RainSeries = sapply(RainSeries, FUN = function(X) GetRandomValue(X));
-
-##create Module from CSM
-#Rcpp::sourceCpp('C:/Users/Lior/master/evapocalc/Calcyp/main.cpp');
-#n = new(CSM,2);
-
 
