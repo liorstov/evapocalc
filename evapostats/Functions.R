@@ -15,14 +15,33 @@ GetRandomValue <- function(X) {
     }
 }
 
+joinRMSD = function(diff, N) {
+    return(sqrt(sum(diff)/sum(N)))
+}
 
 
 rmsd <- function(observed,measured) {
     sqrt(sum((observed-measured) ^ 2)/length(observed))
 }
+MSD = function(observed, measured) {
+    sum(abs(observed-measured))/length(observed)
+}
+
+
 
 difference <- function(observed, measured) {
     sum((observed - measured) ^ 2) 
+}
+LOOCV = function(CV) {
+    resCV = tibble(profile = numeric(), val = numeric(), dust = numeric(), rain = numeric())
+    for (item in unique(CV$profile)) {
+        res = CV %>% filter(profile != item) %>% group_by(rain, dust) %>% summarise(RMSD = joinRMSD(mean, comps))
+        res = res %>% arrange(RMSD) %>% head(1)
+        res = CV %>% filter(profile == item, dust == res$dust, rain == res$rain)
+        resCV = resCV %>% add_row(profile = item, val = res$normRMSD, dust = res$dust, rain = res$rain)
+    }
+
+    return(resCV)
 }
 
 CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.013,
@@ -108,7 +127,7 @@ plotSoilResults = function(res,observed = NULL) {
   # return(ggarrange(WP1, WP2, WP3,WP4,nrow = 2,ncol = 2))
 
 }
-plotSoilResultsAgg = function(res, obs) {
+plotSoilResultsAgg = function(res, obs,title = NULL) {
     SWDp80 = res[[1]]$SWDp80
     res = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
             pluck("gypsum") %>% melt(id.vars = "rowid", value.name = "value") %>% group_by(rowid) %>%
@@ -116,16 +135,15 @@ plotSoilResultsAgg = function(res, obs) {
             mutate(observed = obs)
     
     res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", - depth, - min, - max)
-    WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor)) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
+    WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor)) +   geom_bar(stat = "identity", position = "dodge2") +scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
                     scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom") +
-                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
-                   geom_bar(stat = "identity", position = "dodge2") +
-                    geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +
+                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +                 
+                    geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +labs(title = title)+
                     geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80 = ", SWDp80))) + theme(legend.title = element_blank()) 
 
    
 
-    return(ggarrange(WP1));
+    return(WP1);
 
 }
 plotSoilResultsRMSD = function(res, obs,CalibArray) {
@@ -138,19 +156,21 @@ plotSoilResultsRMSD = function(res, obs,CalibArray) {
 }
 
 #return not rmsd but difference netween obs abd res
-plotSoilResultsMean = function(res, obs, CalibArray) {
- 
-    rmsdTable = res %>% transpose %>%  pluck("gypsum") %>% map_dbl(.f = ~(difference(.x, obs))) %>% as_tibble() %>% add_column(rain = CalibArray[, 1], dust = CalibArray[, 2],n = length(obs)) %>% nest(value= c(value,n))
+plotSoilResultsMean = function(res, obs) {
 
+    meanOBS = mean(obs);
+   rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, dust = .x$DF, value = difference(.x$gypsum, obs), comps = length(obs)))) %>% group_by(rain, dust, comps) %>%
+            summarise(mean = mean(value), min = quantile(value, 0.05), max = quantile(value, 0.95),n = n(),meanOBS) %>% nest(value = c(mean, min, max, comps,n,meanOBS))
     return(rmsdTable)
+    
 
 }
 
-plotSoilResultsSurface = function(res, obs, CalibArray) {
-    rmsdTable = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
-    pluck("gypsum") %>% map_dbl(.f = ~rmsd(.x, obs)) %>% enframe() %>% add_column(rain = CalibArray[, 1], dust = CalibArray[, 2])
-
-   print( ggplot(rmsdTable, aes(x = rain, y = dust, z = value)) +geom_raster(aes(fill = value))+  geom_contour()  + labs(x = "rain [ml/l]", y = "dust flux [g/m2/yr]", title = "",fill = "RMSD [meq/100g soil]"))
+plotSoilResultsSurface = function(res) {
+    
+    res = CV %>% filter(profile == "T1.9" & rain %in% seq(0, 20, by = 0.5) & dust %in% seq(0, 150, by = 0.5))
+    WP5= ggplot(res, aes(x = rain, y = dust, z = meanRMSD, fill = meanRMSD, color = meanRMSD)) + scale_fill_gradientn(colours = rainbow(4)) +
+        geom_raster() +geom_contour(color = "blue",binwidth = 0.5) + labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", title = "T1.9", fill = "RMSD \n[meq/100g soil]")
    return(rmsdTable)
 }
 
@@ -212,4 +232,5 @@ meanRMSD = function(results) {
     results = results ^ 2;
     return(sqrt(mean(results)));
 }
+
 

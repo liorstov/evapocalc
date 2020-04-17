@@ -389,3 +389,4 @@ healthchecksdb
 *.dat
 *.jar
 *.rdata
+/test.rdataTmp
