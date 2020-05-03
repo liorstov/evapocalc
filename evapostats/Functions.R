@@ -35,7 +35,7 @@ difference <- function(observed, measured) {
 LOOCV = function(CV) {
     resCV = tibble(profile = numeric(), val = numeric(), dust = numeric(), rain = numeric())
     for (item in unique(CV$profile)) {
-        res = CV %>% filter(profile != item) %>% group_by(rain, dust) %>% summarise(RMSD = joinRMSD(mean, comps))
+        res = CV %>% filter(profile != item) %>% group_by(rain, dust) %>% summarise(RMSD = joinRMSD(mean, comps),meanNRMSD = mean(normRMSD))
         res = res %>% arrange(RMSD) %>% head(1)
         res = CV %>% filter(profile == item, dust == res$dust, rain == res$rain)
         resCV = resCV %>% add_row(profile = item, val = res$normRMSD, dust = res$dust, rain = res$rain)
@@ -160,18 +160,19 @@ plotSoilResultsMean = function(res, obs) {
 
     meanOBS = mean(obs);
    rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, dust = .x$DF, value = difference(.x$gypsum, obs), comps = length(obs)))) %>% group_by(rain, dust, comps) %>%
-            summarise(mean = mean(value), min = quantile(value, 0.05), max = quantile(value, 0.95),n = n(),meanOBS) %>% nest(value = c(mean, min, max, comps,n,meanOBS))
+            summarise(mean = mean(value), min = quantile(value, 0.05), max = quantile(value, 0.95),n = n(),meanOBS,sd = sd(value)) %>% nest(value = c(mean, min, max, comps,n,meanOBS,sd))
     return(rmsdTable)
     
 
 }
 
-plotSoilResultsSurface = function(res) {
+plotSoilResultsSurface = function(CV) {
     
-    res = CV %>% filter(profile == "T1.9" & rain %in% seq(0, 20, by = 0.5) & dust %in% seq(0, 150, by = 0.5))
-    WP5= ggplot(res, aes(x = rain, y = dust, z = meanRMSD, fill = meanRMSD, color = meanRMSD)) + scale_fill_gradientn(colours = rainbow(4)) +
-        geom_raster() +geom_contour(color = "blue",binwidth = 0.5) + labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", title = "T1.9", fill = "RMSD \n[meq/100g soil]")
-   return(rmsdTable)
+    res = CV %>% filter(profile %in% c("T1.10") & rain %in% seq(1, 20, by = 1) & dust %in% seq(0, 100, by = 1)) %>% group_by(rain, dust) %>% summarise(meanRMSD = joinRMSD(mean, comps), sum = sum(n),meanNRMSD = mean(normRMSD))
+   WP3 = ggplot(res, aes(x = rain, y = dust, z = log10(meanRMSD), fill = log10(meanRMSD))) + scale_fill_gradientn(colours = rainbow(4)) + scale_x_continuous(expand = c(0, 0.0)) + scale_y_continuous(expand = c(0, 0.0)) +
+        geom_raster(interpolate = TRUE) + geom_contour(color = "black", binwidth = 0.04) + labs(x = "Sulfate in rain water [mL/L]", y = "Dust Flux [g/m2/yr]", fill = "log(RMSD)", title = "T1.10") +
+        geom_point(data = res[1117,], size = 20, shape = 1, color = "blue", stroke = 3) + geom_text(data = res[1117,], size = 6, label = "Optimal point", color = "blue", hjust = 0, nudge_x = 1)
+   return(ggarrange(WP1,WP2,WP3,WP4))
 }
 
 plotMoisture = function(res,obs) {

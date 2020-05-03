@@ -1,5 +1,7 @@
 
 load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
+load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList.RData")
+
 require(tidyverse)
 require(Rcpp)
 require(ggplot2)
@@ -9,13 +11,14 @@ require(tictoc)
 require(R.matlab)
 require(gganimate)
 require(pbapply)
+require(metR)
 
 
-theme_set(theme_classic() + theme(legend.key.size = unit(2, "picas"), legend.text = element_text(size = 10), legend.title = element_text(size = 10),
-axis.text.x = element_text(size = 20, angle = 43, hjust = 1), title = element_text(size = 20),
-axis.text.y = element_text(size = 25),
-axis.title.y = element_text(size = 20),
-axis.title.x = element_text(size = 20),
+theme_set(theme_classic() + theme(legend.key.size = unit(2, "picas"), legend.text = element_text(size = 25), legend.title = element_text(size = 25),
+axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
+axis.text.y = element_text(size = 28),
+axis.title.y = element_text(size = 35),
+axis.title.x = element_text(size = 35),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
 panel.border = element_rect(colour = "black", fill = NA, size = 0)))
@@ -133,94 +136,40 @@ T1.9Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
 T1.10Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
 
 FCarray = seq(0.02, 0.3, by = 0.01);
-RainArr = seq(0, 20, by = 1); 
-DustArr = c(seq(50, 150, by = 1));
-repetition = 1:2
-rainDustArray =as.matrix(crossing(RainArr, DustArr,repetition))
+RainArr = seq(10, 15, by = 1);
+DustArr = c(seq(6,100, by = 1));
+repetition = 1:6
+rainDustArray = as.matrix(crossing(RainArr, DustArr, repetition))
+nrow(rainDustArray)
 #par computation----
-require(parallel)
-load("synth.RData")
-cl <- makeCluster(6, type = "PSOCK")
+source("evapostats/parallel.R");
 
-clusterExport(cl, c("Zel11Observed", "Zel12Observed", "Zel13Observed", "T1.9Observed", "T1.10Observed", "rainDustArray"))
 
-clusterEvalQ(cl, {
-    require(tidyverse)
-    require(Rcpp)
-    require(ggplot2)
-    require(reshape2)
-    require(zoo)
-    require(tictoc)
-    Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-    b <<- new(CSMCLASS);
-    source("C:/Users/liorst/source/repos/evapocalc/evapostats/Functions.R", encoding = "Windows-1252")
-})
-clusterExport(cl, "SynthRainE")
-rm("SynthRainE")
-gc()
-clusterEvalQ(cl, ls())
-tic()
-resultsT1.10.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsT1.9.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-clusterEvalQ(cl, { rm("SynthRainE"); gc(); })
-clusterExport(cl, "SynthRainS")
-rm("SynthRainS")
-gc()
-resultsZel11.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-#resultsZel12.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsZel12.par = list();
-toc()
-#resultsZel13.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 3000, plotRes = 0, Depth = tail(Zel13Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsZel13.par = list();
-save(list = c("resultsT1.10.par", "resultsT1.9.par", "resultsZel11.par"), file = "test8.RData")
-stopCluster(cl)
-
-#combine results from different calculations
-results = list(s10 = resultsT1.10.par, s9 = resultsT1.9.par, zel11 = resultsZel11.par, zel12 = resultsZel12.par, zel13 = resultsZel13.par) %>% map2(results, append)
-
-RMSD.T.10 = plotSoilResultsMean(results$s10, c(T1.10Observed %>% pull(mean))) %>% rename(T1.10 = value)
-RMSD.T1.9 = plotSoilResultsMean(results$s9, c(T1.9Observed %>% pull(mean))) %>% rename(T1.9 = value)
-RMSD.Zel11 = plotSoilResultsMean(results$zel11, c(Zel11Observed %>% pull(mean))) %>% rename(zel11 = value)
-#RMSD.Zel12 = plotSoilResultsMean(results$zel12, c(Zel12Observed %>% pull(mean))) %>% rename(zel12 = value)
-#RMSD.Zel13 = plotSoilResultsMean(results$zel13, c(Zel13Observed %>% pull(mean))) %>% rename(zel13 = value)
-#---
-#join all profiles
-CV = RMSD.T.10 %>% left_join(RMSD.T1.9, by = c("rain", "dust")) %>% left_join(RMSD.Zel11, by = c("rain", "dust")) %>%
-    gather("profile", "value", - rain, - dust) %>% unnest() %>% rowwise() %>% mutate(minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% ungroup() %>% mutate(site = if_else(str_detect(profile, "zel"), "Zel", "SH"))
  CVSHOnly= CV %>% filter(str_detect(profile, "T"));
-CVZelOnly = CV %>% filter(str_detect(profile, "zel"))
 
-dustTable = CV %>% filter(rain == 13)
-ggplot(dustTable, aes(x = dust, y = meanRMSD, color = profile, min = minRMSD, max = maxRMSD)) + geom_line() + geom_point() + geom_ribbon(alpha = 0.3) + geom_line(aes(y = normRMSD)) + coord_cartesian(ylim = c(0,10), xlim = c(0,10))
-                labs(x = "dust flux [g/m2/year]", y = "RMSD meq/100g soil", color = "profile", title = "dust flux using optimal rain sulfate: 13 mL/L ") + stat_summary(aes(group = site, color = site), size = 2, geom = "line", fun.y = "mean")
+dustTable = CV %>% filter(rain == 13 & profile == "T1.10" | rain == 14 & profile == "T1.9" | rain == 16 & profile == "zel11"  )
+ggplot(dustTable, aes(x = dust, y = meanRMSD, color = profile, min = minRMSD, max = maxRMSD)) + geom_line() + geom_point() + geom_ribbon(alpha = 0.3) + geom_line(aes(y = normRMSD,size="- norm")) + coord_cartesian(ylim = c(), xlim = c())+
+                labs(x = "dust flux [g/m2/year]", y = "normalised RMSD [-]", color = "profile", title = "dust flux using optimal rain sulfate ") 
 
-rainTable = CV %>% filter(dust == 5)
-ggplot(rainTable, aes(x = rain, y = meanRMSD, group = profile, color = profile, max = maxRMSD, min = minRMSD)) + geom_line(size = 1) + geom_point() + geom_line(aes(y = normRMSD, size = "- norm")) + coord_cartesian(ylim = c(0,20),xlim = c()) + #geom_ribbon(alpha = 0.3) +
-    labs(x = "SO4 in rain [ml/L]", y = "RMSD meq/100g soil", color = "profile", title = "sulfate in rain using optimal dust flux: 5 g/m2/yr") # +stat_summary(aes(group=site,color = site),size = 2,geom = "line",fun.y = "mean") 
+rainTable = CV %>% filter(dust == 41& profile == "T1.10" | dust==33 & profile == "T1.9" | dust== 15 & profile == "zel11")
+ggplot(rainTable, aes(x = rain, y = meanRMSD, group = profile, color = profile, max = maxRMSD, min = minRMSD)) + geom_line(size = 1) + geom_point() + geom_line(aes(y = normRMSD, size = "- norm")) + coord_cartesian(ylim = c(0,3),xlim = c()) + geom_ribbon(alpha = 0.3) +
+    labs(x = "SO4 in rain [ml/L]", y = "normalised RMSD [-]", color = "profile", title = "sulfate in rain using optimal dust flux") # +stat_summary(aes(group=site,color = site),size = 2,geom = "line",fun.y = "mean") 
 
 #cross validation
-
-ggplot(CV %>% group_by(profile) %>% arrange(meanRMSD) %>% slice(1), aes(x = rain, y = dust, color = profile)) + geom_point(size = 3) +labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", title = "", fill = "RMSD [meq/100g soil]")
-cvres = LOOCV(CV) %>% transmute(All = val, profile) %>% gather("site", "value", - profile) # %>% left_join(LOOCV(CVSHOnly) %>% transmute(SH = val, profile), by = "profile") %>% left_join(LOOCV(CVZelOnly) %>% transmute(Zel = val, profile), by = "profile") 
-ggplot(cvres, aes(x = site, y = value)) + geom_point(stat = "summary", fun.y = "mean", size = 7) + geom_errorbar(stat = "summary", fun.data = "mean_se", fun.args = list(mult = 1.96))+geom_point(aes(color = profile),size = 5)+ labs(x = NULL, y = "RMSD meq/100g soil", fill = NULL,title = "CV results") #+ geom_bar(fill = "gray", stat = "identity", alpha = 0.1)
-
+optimal = CV %>% filter(dust < 10) %>% group_by(profile) %>% arrange(meanRMSD) %>% slice(1)
+optimal = LOOCV(CV %>% filter(dust < 96)) 
+WP1 = ggplot(optimal, aes(x = rain, y = dust, color = profile)) + geom_point(size = 6, show.legend = FALSE) + labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", title = "validation parameters", fill = "RMSD [meq/100g soil]") + coord_cartesian(ylim = c(0, 90), xlim = c(0, 20))
+cvres = LOOCV(CV %>% filter(dust < 10)) %>% transmute(All = val, profile) %>% gather("site", "value", - profile) # %>% left_join(LOOCV(CVSHOnly) %>% transmute(SH = val, profile), by = "profile") %>% left_join(LOOCV(CVZelOnly) %>% transmute(Zel = val, profile), by = "profile") 
+WP2 = ggplot(cvres, aes(x = site, y = value)) + geom_point(stat = "summary", fun.y = "mean", size = 7) + geom_errorbar(stat = "summary", fun.data = "mean_se", fun.args = list(mult = 1.96))+geom_point(aes(color = profile),size = 5)+ labs(x = NULL, y = "norm. RMSD", fill = NULL,title = "CV results") #+ geom_bar(fill = "gray", stat = "identity", alpha = 0.1)
+ggarrange(WP2, WP1,nrow=1)
 #list of retrun variables (fucking genius)----
-WP1 = plotSoilResultsAgg(results$s10 %>% keep(~.x$RSO4 == 12.5 & .x$DF == 5.5), c(T1.10Observed %>% pull(mean)),  "T1.10")
-WP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 15.5 & .x$DF == 4), c(T1.9Observed %>% pull(mean)), "T1.9")
-WP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == 14.25 & .x$DF == 5), c(Zel11Observed %>% pull(mean)), "zel11")
-WP4 = plotSoilResultsAgg(results$zel12 %>% keep(~.x$RSO4 == 5 & .x$DF == 5.5), c(Zel12Observed %>% pull(mean)), "zel12")
-WP5 = plotSoilResultsAgg(results$zel13 %>% keep(~.x$RSO4 == 4 & .x$DF == 3.5), c(Zel13Observed %>% pull(mean)), "zel13")
-ggarrange(WP1,WP2,WP3,WP4,WP5)
+aWP1 = plotSoilResultsAgg(results$s10 %>% keep(~.x$RSO4 == 11 & .x$DF == 41), c(T1.10Observed %>% pull(mean)),  "T1.10")
+aWP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 14 & .x$DF == 33), c(T1.9Observed %>% pull(mean)), "T1.9")
+aWP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == 16& .x$DF == 15), c(Zel11Observed %>% pull(mean)), "zel11")
+#WP4 = plotSoilResultsAgg(results$zel12 %>% keep(~.x$RSO4 == 5 & .x$DF == 5.5), c(Zel12Observed %>% pull(mean)), "zel12")
+#WP5 = plotSoilResultsAgg(results$zel13 %>% keep(~.x$RSO4 == 4 & .x$DF == 3.5), c(Zel13Observed %>% pull(mean)), "zel13")
+ggarrange(aWP1,aWP2,aWP3,WP4,nrow = 2)
 
-#rmsd as compared to observed
-
-ggplot(CV %>% filter(profile %in% c("zel","SH")), aes(x = rain, y = meanRMSD, color = profile)) + geom_line() + geom_point() + 
-                labs(x = "SO4 in rain [ml/L]", y = "RMSD meq/100g soil", color = "profile", title = "sulfate in rain using optimal dust flux")
-ggplot(rmsdTable, aes(x = rain, y = value, color = profile)) + geom_line() + geom_point() +
-                labs(x = "SO4 in rain [ml/L]", y = "RMSD meq/100g soil", color = "profile", title = "sulfate in rain using optimal dust flux") )
-
-
-CV %>% group_by(rain, dust) %>% summarise(sqrt(sum(value) / sum(n)))
 
 
 #i = 0;
@@ -230,12 +179,14 @@ CV %>% group_by(rain, dust) %>% summarise(sqrt(sum(value) / sum(n)))
     #CVRes[i] = (sqrt(headline %>% pull(item) / CVn[1, item]))
 #}
 
-dustsens =  dustTable %>% group_by(dust) %>% summarise(joinRMSD(mean, n))
-rainsens=  rainTable%>% group_by(rain) %>% summarise(joinRMSD(mean, n))
-rainSens = CV %>% filter((round(rain, 3) == 11.97 | round(rain, 3) == 14.64) & round(dust, 1) == 4.2) %>% group_by(rain) %>% summarise(value = mean(RMSD))
-diff(rainSens$value) / diff(rainSens$rain)
-diff(dustsens$value) /diff(dustsens$dust)
-resCV = tibble(name = numeric(), val = numeric())
+dustsens = CV %>% filter(round(dust,2) %in% c(5, 6, 7)&rain == 13) %>% group_by(par = dust) %>% summarise(value = joinRMSD(mean, n))
+rainsens = CV %>% filter(round(rain,2) %in% c(10.4,13,15.6)&dust==6) %>% group_by(par=rain) %>% summarise(value = joinRMSD(mean, n))
+diff(rainsens$value[1:2]) / diff(rainsens$par[1:2]) * rainsens$par[2]/rainsens$value[2] #* var(rainsens$par[1:2]) / var(rainsens$value[1:2])
+diff(dustsens$value[1:2]) / diff(dustsens$par[1:2]) * dustsens$par[2] / dustsens$value[2] #* var(dustsens$par[1:2]) / var(dustsens$value[1:2])
+
+diff(rainsens$value[3:2]) / diff(rainsens$par[3:2]) * rainsens$par[2] / rainsens$value[2] # * var(rainsens$par[2:3]) / var(rainsens$value[2:3])
+diff(dustsens$value[2:3]) / diff(dustsens$par[2:3]) * dustsens$par[2] / dustsens$value[2] #* var(dustsens$par[2:3]) / var(dustsens$value[2:3])
+
 
 
 for (item in unique(destsens$factor)) {

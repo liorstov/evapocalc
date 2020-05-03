@@ -5,7 +5,9 @@ require(latticeExtra)
 require(ggplot2)
 require(ggpmisc)
 require(dplyr)
-setwd("C:\\Users\\Lior\\master\\evapocalc\\aqp")
+require(tidyverse)
+
+setwd("C:\\Users\\liorst\\Source\\Repos\\evapocalc")
 
 
 without.RC.Horizons = FALSE
@@ -54,13 +56,6 @@ ages = as_tibble(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age"));
 dataframe = dataframe %>% full_join(ages,"ageclass")
 dataframe$AvgAge = apply(dataframe[c("ageclass", "AvgAge","min_age","max_age")], 1, function(X) setAge(X[1],X[2],X[3],X[4]))
 
-##omit na
-#dataframe = dataframe[which(!is.na(dataframe$caso4)),];
-#dataframe = dataframe[which(!is.na(dataframe$AvgAge)),];
-
-## filter by arid environment
-#dataframe = dataframe[which(dataframe$MeanAnnualPrecipitation <= 100),]
-
 #filter by regsols
 dataframe = dataframe[which(dataframe$SoilType == 859),]
 
@@ -69,10 +64,7 @@ range = unique(dataframe$MeanAnnualPrecipitation);
 dataframe$group = apply(dataframe[, c("MeanAnnualPrecipitation")], 1, FUN = function(X) getPercipitationRange(X, range));
 dataframe$groupNum = as.integer(factor(dataframe$group))
 
-
-##get the shallowest ca horizon for each site
-#top.ca.per.site = get.top.ca.horizon(dataframe)
-#group.ca.count = colsums(table(top.ca.per.site$siteid, top.ca.per.site$groupnumber) != 0)
+dataframe = dataframe %>% filter(!str_detect(SiteName, "12|13|14|15")) 
 
 
 #get a list of all the sites
@@ -86,28 +78,28 @@ site(AQPClass) <- ~ subregion
 
 #slub.structure = horizon thickness cm
 
-caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
-caso4.slab.siteid = slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd)
-caso4.slab.siteid = slab(AQPClass, fm = subregion ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
+#caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
+caso4.slab.siteid = as_tibble(slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd))
+#caso4.slab.siteid = slab(AQPClass, fm = subregion ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
 
 
-caso4.slab.siteid = merge(caso4.slab.siteid, dataframe[, c("SiteName", "AvgAge", "ageclass")], by = "SiteName")
+caso4.slab.siteid = caso4.slab.siteid  %>% left_join(dataframe[, c("SiteName", "AvgAge", "ageclass", "MeanAnnualPrecipitation")], by = "SiteName")
 #this is for the strips
 
 #data for plotting 
 dataplot = caso4.slab.siteid[grep("ZEL", caso4.slab.siteid$SiteName),]
 dataplot = dataplot[grep("early", dataplot$ageclass),]
-dataplot = caso4.slab.siteid
+dataplot = (caso4.slab.siteid)
 #create plot
 
-my.plot1 = xyplot(top ~ mean | paste(SiteName, "\nMAR: ", MeanAnnualPrecipitation, "mm\n", ageclass), data = dataplot, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper,  ylab = 'Depth [cm]', xlab = list('CaSO4 concentration [meq/100g soil]', cex = 0.5),
-                        ylim = c(105, -5), layout = c(7, 2), #, xlim = c(-10, 70)
+my.plot1 = xyplot(top ~ mean | paste(SiteName,"\n",ageclass), data = dataplot,  upper = caso4.slab.siteid$upper,  ylab = list('Depth [cm]',cex=3), xlab = list('CaSO4 concentration [meq/100g soil]', cex = 3),
+                        ylim = c(105, -5), layout = c(), #, xlim = c(-10, 70)
                         panel = panel.depth_function,
                   prepanel = prepanel.depth_function,
-            par.strip.text = list(cex = 0.80, lines = 4),
-            scales = list(x = list(tick.number = 2, cex = 1)),
-                   auto.key = list(columns = 5, lines = TRUE, points = FALSE), strip = strip.custom(),
-                   index.cond = list(c(6, 12, 7, 8, 9, 10, 11, 4, 1, 5, 2, 3)))
+            par.strip.text = list(cex = 2.2, lines = 3),
+            scales = list(x = list(tick.number = 2, cex = 2), y = list(cex = 2)),
+                   auto.key = list( lines = TRUE, points = FALSE), strip = strip.custom(),
+                   index.cond = list(c(1,3,7,4,6,2,5,8)))
 
 my.plot2 = xyplot(top ~ mean | paste("MAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
                         ylim = c(105, -5), xlim = c(-10, 70), layout = c(4, 1),
