@@ -33,7 +33,7 @@ difference <- function(observed, measured) {
     sum((observed - measured) ^ 2) 
 }
 LOOCV = function(CV) {
-    resCV = tibble(profile = numeric(), val = numeric(), dust = numeric(), rain = numeric())
+    resCV = tibble(profile = character(), val = numeric(), dust = numeric(), rain = numeric())
     for (item in unique(CV$profile)) {
         res = CV %>% filter(profile != item) %>% group_by(rain, dust) %>% summarise(RMSD = joinRMSD(mean, comps),meanNRMSD = mean(normRMSD))
         res = res %>% arrange(RMSD) %>% head(1)
@@ -56,6 +56,7 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
         randomYears = sample(unique(raindata$year), duration)
         raindata = raindata %>% filter(year %in% randomYears)
     }
+    raindata = raindata %>%  mutate(rainFinal = (year > 10000) * ageRainfunctest(year, rain) ,rain = rain-rainFinal)
     tictoc::tic()
     list =  b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
                    DustGyp, AETFactor, verbose, dustFlux/10000/365, rainCa, rainSO4);
@@ -89,7 +90,7 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
     list$DGyp = DustGyp;
     list$RCa = rainCa;
     list$RSO4 = rainSO4;
-    list$WD = NULL;
+  #  list$WD = DayWD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), sd = sd(max)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(max), var = var(max));
 
     if (is.null(obs)) {
         list$rmsd = rmsd(obs, list$gypsum)
@@ -109,12 +110,12 @@ plotSoilResults = function(res,observed = NULL) {
                         dplyr::select(depth, calculated, observed) %>% gather("factor", "gypsum", - depth)
 
     WP1 = ggplot(resLeach, aes(x = depth, y = gypsum, fill = factor)) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
-                    scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom", expand = c(0, 0.0)) +
+                    scale_y_continuous(name = "gypsum mEq/100g soil", expand = c(0, 0.0)) +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
                    geom_bar(stat = "identity", position = "dodge2") +
                     #geom_line(aes(x = depth, y = Ca, color = "Ca")) +
                     #geom_line(aes(x = depth, y = SO4, color = "SO4")) +
-                    ggtitle(paste("duration = ", duration, "; daily dust flux = ", round(res$DF*1000,3), "mg/cm3/day; dust Ca = ", res$DCa, "mg/g; dust SO4 = ", res$DSO4, "mg/g; Rain Ca = ", res$RCa, "mg/L; Rain SO4 = ", res$RSO4,"mg/L")) +
+                    #ggtitle(paste("duration = ", res$duration, "; daily dust flux = ", round(res$DF*1000,3), "mg/cm3/day; dust Ca = ", res$DCa, "mg/g; dust SO4 = ", res$DSO4, "mg/g; Rain Ca = ", res$RCa, "mg/L; Rain SO4 = ", res$RSO4,"mg/L")) +
                     #geom_vline(aes(xintercept = res$SMeanWD, color = paste("MeanSWD = ", res$SMeanWD))) +
                     #geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
                     geom_vline(aes(xintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80))) 
@@ -131,19 +132,19 @@ plotSoilResultsAgg = function(res, obs,title = NULL) {
     SWDp80 = res[[1]]$SWDp80
     res = res %>% transpose %>% map_depth(2, ~ rowid_to_column(tibble(value = .x))) %>%
             pluck("gypsum") %>% melt(id.vars = "rowid", value.name = "value") %>% group_by(rowid) %>%
-            dplyr::summarise(min = quantile(value, 0.05), gypsum = mean(value), max = quantile(value, 0.95)) %>% mutate(depth = (rowid - 0.5) * res[[1]]$thick) %>%
-            mutate(observed = obs)
+            dplyr::summarise(min = quantile(value, 0.05), calculated = mean(value), max = quantile(value, 0.95)) %>% mutate(depth = (rowid - 0.5) * res[[1]]$thick) %>%
+            mutate(observed = obs, profile = title)
     
-    res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", - depth, - min, - max)
-    WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor)) +   geom_bar(stat = "identity", position = "dodge2") +scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
-                    scale_y_continuous(name = "gypsum mEq/100g soil", position = "bottom") +
-                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +                 
-                    geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +labs(title = title)+
-                    geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80 = ", SWDp80))) + theme(legend.title = element_blank()) 
+    res = res %>% dplyr::select(-rowid) %>% gather("factor", "gypsum", - depth, - min, - max,-profile)
+    WP1 = ggplot(res, aes(x = depth, y = gypsum, fill = factor), palette = "jco") + geom_bar(stat = "identity", position = "dodge2") + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
+                    scale_y_continuous(name = "gypsum mEq/100g soil") +
+                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) +
+                    geom_errorbar(aes(x = depth + 1, ymin = min, ymax = max)) +
+                    geom_vline(aes(xintercept = SWDp80, color = paste("SWDp80"))) + theme(legend.title = element_blank()) + facet_wrap(profile ~ .) + theme(strip.text.x = element_text(size = 30))
 
    
 
-    return(WP1);
+    return(list(WP1,res));
 
 }
 plotSoilResultsRMSD = function(res, obs,CalibArray) {
@@ -166,13 +167,14 @@ plotSoilResultsMean = function(res, obs) {
 
 }
 
-plotSoilResultsSurface = function(CV) {
+plotSoilResultsSurface = function(CV,required) {
     
-    res = CV %>% filter(profile %in% c("T1.10") & rain %in% seq(1, 20, by = 1) & dust %in% seq(0, 100, by = 1)) %>% group_by(rain, dust) %>% summarise(meanRMSD = joinRMSD(mean, comps), sum = sum(n),meanNRMSD = mean(normRMSD))
-   WP3 = ggplot(res, aes(x = rain, y = dust, z = log10(meanRMSD), fill = log10(meanRMSD))) + scale_fill_gradientn(colours = rainbow(4)) + scale_x_continuous(expand = c(0, 0.0)) + scale_y_continuous(expand = c(0, 0.0)) +
-        geom_raster(interpolate = TRUE) + geom_contour(color = "black", binwidth = 0.04) + labs(x = "Sulfate in rain water [mL/L]", y = "Dust Flux [g/m2/yr]", fill = "log(RMSD)", title = "T1.10") +
-        geom_point(data = res[1117,], size = 20, shape = 1, color = "blue", stroke = 3) + geom_text(data = res[1117,], size = 6, label = "Optimal point", color = "blue", hjust = 0, nudge_x = 1)
-   return(ggarrange(WP1,WP2,WP3,WP4))
+    res = CV %>% filter(profile %in% c(required) & rain %in% seq(1, 20, by = 1) & dust %in% seq(0, 100, by = 1)) %>% group_by(rain, dust) %>% summarise(meanRMSD = joinRMSD(mean, comps), sum = sum(n), meanNRMSD = mean(normRMSD)) %>% mutate(profile = ifelse(length(required) > 1, "all", required))
+    optimal =     res %>% arrange(meanNRMSD) %>% filter(dust < 10) %>% head(1)
+   WP = ggplot(res, aes(x = rain, y = dust, z = log10(meanRMSD), fill = log10(meanRMSD))) + scale_fill_gradientn(colours = rainbow(4)) + scale_x_continuous(expand = c(0, 0.0)) + scale_y_continuous(expand = c(0, 0.0)) +
+        geom_raster(interpolate = TRUE) + geom_contour(color = "black", binwidth = 0.04) + labs(x = "Sulfate in rain water [mL/L]", y = "Dust Flux [g/m2/yr]", fill = "log(RMSD)") + facet_wrap(profile ~ .) + theme(strip.text.x = element_text(size = 30))
+       # geom_point(data = optimal, size = 20, shape = 1, color = "blue", stroke = 3) + geom_text(data = optimal, size = 6, label = "Optimal point", color = "blue", hjust = 0, nudge_x = 1)
+   return(list(WP,res))
 }
 
 plotMoisture = function(res,obs) {
@@ -196,12 +198,12 @@ plotMoisture = function(res,obs) {
     return(rmsd(resLeach$sim, resLeach$kik))
 }
 
-plotAnimation= function(res, obs) {
-    bla = res$gypsumDay[, c(1, 6:15)] %>% gather("comp", "gyp", - day) %>% mutate(depth = (as.numeric(comp) - 0.5) * 5)
-    p = ggplot(bla) + geom_bar(aes(x = depth, y = gyp), stat = "identity") + scale_x_reverse() + coord_flip() +
-                    scale_y_continuous(name = "gypsum meq/100g soil", position = "bottom") +
-                    theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1)) + transition_time(day) + ggtitle('day: {frame_time}')
-    animate(p, nframe = 200, renderer = av_renderer())
+plotAnimation= function(res) {
+    bla = res$gypsumDay[, c(1, 5:15)] %>% gather("comp", "gyp", - day,-WD) %>% mutate(depth = (as.numeric(comp) - 0.5) * 5, WD = ifelse(WD == 2.5,NA, WD)) 
+    p = ggplot(bla) + geom_bar(aes(y = depth, x = gyp), stat = "identity") + scale_x_continuous(name = "gypsum meq/100g soil", position = "top") + geom_hline(aes(yintercept = WD,color = "Wetting\ndepth"),size = 3) +
+                    scale_y_reverse(name = "depth [cm]") + scale_color_manual(values = "blue")+
+                   theme(axis.text.x = element_text(size = 25, angle = 0, hjust = 0, margin = margin(b = 5))) + transition_time(day) + ggtitle('day: {as.integer(frame_time)}\t\t year: {as.integer(frame_time/365)}') 
+    animate(p, nframe = 400, renderer = av_renderer(), height = 800, width = 1200)
 }
 
 #this function get a simulated rain series and PET to K table. returns the PET for every day in the

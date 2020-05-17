@@ -92,13 +92,14 @@ dataplot = dataplot[grep("early", dataplot$ageclass),]
 dataplot = (caso4.slab.siteid)
 #create plot
 
-my.plot1 = xyplot(top ~ mean | paste(SiteName,"\n",ageclass), data = dataplot,  upper = caso4.slab.siteid$upper,  ylab = list('Depth [cm]',cex=3), xlab = list('CaSO4 concentration [meq/100g soil]', cex = 3),
-                        ylim = c(105, -5), layout = c(), #, xlim = c(-10, 70)
-                        panel = panel.depth_function,
+my.plot1 = xyplot(top ~ mean | paste(SiteName, "\n", ageclass), data = dataplot, upper = caso4.slab.siteid$upper, ylab = list('Depth [cm]', cex = 3), xlab = list('CaSO4 concentration [meq/100g soil]', cex = 3),
+                        ylim = c(105, -5), layout = c(),
+                        panel = panel.depth_function, cex = 9,
                   prepanel = prepanel.depth_function,
             par.strip.text = list(cex = 2.2, lines = 3),
             scales = list(x = list(tick.number = 2, cex = 2), y = list(cex = 2)),
-                   auto.key = list( lines = TRUE, points = FALSE), strip = strip.custom(),
+            par.settings = list(superpose.line = list(col = 'RoyalBlue', lwd =5)),
+                   auto.key = list(lines = TRUE, points = FALSE), strip = strip.custom(),
                    index.cond = list(c(1,3,7,4,6,2,5,8)))
 
 my.plot2 = xyplot(top ~ mean | paste("MAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',

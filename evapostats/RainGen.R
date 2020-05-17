@@ -143,7 +143,7 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain)
 
    
     #dividing the sim series to grups 
-    SynthRain$SeriesNumber = rep(1:NumOfSeries, each = measuredYears)
+    SynthRain$SeriesNumber = rep(1:NumOfSeries, each = measuredYears*365)
 
     return(list(SynthRain = SynthRain, DaysProb = DaysProb))
     #---
@@ -173,9 +173,9 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                     add_column(month = (dmy("1-09-2000") + 0:364)) %>% left_join(IMSRainDay, by = "dayIndex") %>%
                        left_join(rainProb, by="dayIndex");   
 
-    p1 = ggplot(data = SimRainDay, aes(x = month, group = 1)) + geom_line(aes(y = observed, color = "Measured")) + ylab("Wet Probability [-]") + xlab("") +
+    p1 = ggplot(data = SimRainDay, aes(x = month, group = 1)) + geom_line(aes(y = observed, color = "Measured")) + ylab("Wet Prob. [-]") + xlab("") +
                                 geom_line(aes(y = Simulated, color = "Simulated"), size = 1.5) +
-                                geom_line(aes(y = PWET, color = "WET")) +
+                               # geom_line(aes(y = PWET, color = "WET")) +
                                 ggtitle(paste(numOfyears, "years for", stationName)) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
                                    scale_x_date(date_labels = "%B", expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0.0));
@@ -195,9 +195,8 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     #annual rain----
 
     #histogram for observed
-    plotLimit = 100;
+    plotLimit = 120;
     histBreaksSize = 5;
-
     #histogram for observed
     IMSRainAnn = IMSRain %>% filter(rain > 0.1) %>% group_by(waterYear) %>% summarise(annual = sum(rain), WetDays = n()) %>% filter(annual <= plotLimit)
     IMShistannual = hist(IMSRainAnn$annual, breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>%
@@ -264,14 +263,14 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                 left_join(IMSPet, by = "dayIndex") %>% left_join(PETProb, by = "dayIndex") %>% mutate(month = (dmy("1-09-2000") + dayIndex)) %>%
                 mutate(K = replace(K, K == 1, "Wet"), K = replace(K, K == 2, "DAW"), K = replace(K, K == 3, "DAD"))
         p4 = ggplot(data = SimPETDay, aes(x = month, group = 1)) + geom_line(aes(y = Simulated, color = "Simulated"), size = 1.5) +
-            geom_line(aes(y = observed, color = "Measured total")) + ylab("PET [mm / day]") + xlab("") +
+            geom_line(aes(y = observed, color = "Measured")) + ylab("PET [mm / day]") + xlab("") +
             geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
-            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) +
-            geom_line(aes(group = K, y = smoothMean, color = as.factor(paste(K))))
+            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) 
+          #  geom_line(aes(group = K, y = smoothMean, color = as.factor(paste(K))))
 
         p7 = ggplot(data = SimPETDay, aes(x = month, group = 1))  +
             ylab("PET STD [mm / day]") + xlab("") +
-            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) +
+            scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) + 
             geom_line(aes(group = K, y = smoothSTD, color = as.factor(paste(K))))
 
         #--
@@ -354,7 +353,8 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     
     toc()
 
-    return(ggarrange(p1, rainProbabilities, p2, p3, p6, p4,  p7,p5, PETProbabilities))
+   # return(ggarrange(p1, rainProbabilities, p2, p3, p6, p4,  p7,p5, PETProbabilities))
+    return(plot_grid(p1 + theme(legend.position = "none"), p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), p4 + theme(legend.position = "none"), p5 + theme(legend.position = "none"), get_legend(p1), rel_widths = c(1, 0, 1)))
    
   
   

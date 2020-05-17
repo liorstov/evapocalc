@@ -12,9 +12,8 @@ require(R.matlab)
 require(gganimate)
 require(pbapply)
 require(metR)
-
-
-theme_set(theme_classic() + theme(legend.key.size = unit(2, "picas"), legend.text = element_text(size = 25), legend.title = element_text(size = 25),
+require(ggpmisc)
+theme_set(theme_classic() + theme(legend.key.size = unit(2, "picas"), legend.text = element_text(size = 25), legend.title = element_blank(),
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
 axis.text.y = element_text(size = 28),
 axis.title.y = element_text(size = 35),
@@ -36,8 +35,8 @@ b <<- new(CSMCLASS);
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
-rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
+IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
+rainSeriesResults = GenerateSeries(NumOfSeries = 1500, IMSRain = IMSRain);
 PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
 
 SynthRain = rainSeriesResults$SynthRain;
@@ -54,11 +53,13 @@ dev.off()
 
 
 
-duration = 1000
-result = CalcGypsum(SynthRainS, duration, plotRes = 1, Depth = 50, AETFactor =1, FieldCapacity = 0.1, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux =6.52/10000 / 365, DustGyp = 0.005, rainCa = 35, rainSO4 =15);
-plotSoilResults(resultsDustT1.10[[1]])
-
-
+result = CalcGypsum(SynthRainE, 100, plotRes = 0, Depth = 100, wieltingPoint = 0.013, thick = 5, verbose = 1, dustFlux = 5, rainSO4 = 15);
+plotAnimation(result)
+ggplot(bla %>% gather("index", "value", - cent), aes(cent, value, color = index)) + geom_line() + geom_smooth(method = "lm", size = 2) + labs(x = "century [-]", y = "80th perc. of seasonal WD[cm]") + scale_x_continuous(breaks = seq(0, 700, by = 100))
+plotSoilResults(result)
+bla2 = result$WD
+paint = bla %>% dplyr::select(WithRunoff = p80, - mean, cent) %>% left_join(bla2 %>% dplyr::select(NoRunoff = p80 , -mean, cent), by = "cent")
+bla = result$WD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), std = sd(WD)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(std));
 
 #sandbox
 
@@ -108,7 +109,7 @@ fctbl = tibble(FC = FCarray, EV1 = abs(results2 %>% map_dbl(~.x$maxWD) - 5.5), E
         mutate(rmsd = rmsd ^ 2) %>% group_by(FC) %>% summarise(rmsd = sqrt(sum(rmsd) / n()))
 #ggplot(fctbl) + geom_line(aes(x = FC, y = rmsd, color = group)) + scale_x_continuous(breaks = round(unique(fctbl$FC), 3))+
 ggplot(fctbl, aes(x = FC, y = rmsd)) + geom_line() + geom_point() + coord_cartesian(ylim = c(0, 5), expand = 1) + ylab("RMSD [cm]") + xlab("FC [cm3/cm3]")
-
+ggplot(tibble(rain = c(4.2,3.18,3.79,4.26,3.55),wd = c(5.5,4,3.5,4.5,5)),aes(rain,wd)) + geom_point()
 
 #Kc calib----
 kiki1 = SynthRainE %>% filter(year == 1550, dayIndex >= 160 & dayIndex <= 164)
@@ -134,6 +135,9 @@ Zel12Observed = observedProfiles %>% filter(str_detect(SiteName, "12"))
 Zel13Observed = observedProfiles %>% filter(str_detect(SiteName, "13")) 
 T1.9Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
 T1.10Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
+T1.1Observed = observedProfiles %>% filter(str_detect(SiteName, "T1-1"))
+T2.1Observed = observedProfiles %>% filter(str_detect(SiteName, "T2-1$"))
+
 
 FCarray = seq(0.02, 0.3, by = 0.01);
 RainArr = seq(10, 15, by = 1);
@@ -156,21 +160,26 @@ ggplot(rainTable, aes(x = rain, y = meanRMSD, group = profile, color = profile, 
     labs(x = "SO4 in rain [ml/L]", y = "normalised RMSD [-]", color = "profile", title = "sulfate in rain using optimal dust flux") # +stat_summary(aes(group=site,color = site),size = 2,geom = "line",fun.y = "mean") 
 
 #cross validation
-optimal = CV %>% filter(dust < 10) %>% group_by(profile) %>% arrange(meanRMSD) %>% slice(1)
-optimal = LOOCV(CV %>% filter(dust < 96)) 
-WP1 = ggplot(optimal, aes(x = rain, y = dust, color = profile)) + geom_point(size = 6, show.legend = FALSE) + labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", title = "validation parameters", fill = "RMSD [meq/100g soil]") + coord_cartesian(ylim = c(0, 90), xlim = c(0, 20))
+optimal = CV %>% filter(rain <20, dust < 10, n>1 ) %>% group_by(profile) %>% arrange(meanRMSD) %>% dplyr::slice(1)
+optimal = LOOCV(CV %>% filter(dust < 10)) 
+WP1 = ggplot(optimal, aes(x = rain, y = dust, color = profile)) + geom_point(size = 10) + labs(x = "sulfate [ml/l]", y = "dust flux [g/m2/yr]", fill = "RMSD [meq/100g soil]") + coord_cartesian(ylim = c(0, 50), xlim = c(10, 20))
 cvres = LOOCV(CV %>% filter(dust < 10)) %>% transmute(All = val, profile) %>% gather("site", "value", - profile) # %>% left_join(LOOCV(CVSHOnly) %>% transmute(SH = val, profile), by = "profile") %>% left_join(LOOCV(CVZelOnly) %>% transmute(Zel = val, profile), by = "profile") 
 WP2 = ggplot(cvres, aes(x = site, y = value)) + geom_point(stat = "summary", fun.y = "mean", size = 7) + geom_errorbar(stat = "summary", fun.data = "mean_se", fun.args = list(mult = 1.96))+geom_point(aes(color = profile),size = 5)+ labs(x = NULL, y = "norm. RMSD", fill = NULL,title = "CV results") #+ geom_bar(fill = "gray", stat = "identity", alpha = 0.1)
 ggarrange(WP2, WP1,nrow=1)
 #list of retrun variables (fucking genius)----
-aWP1 = plotSoilResultsAgg(results$s10 %>% keep(~.x$RSO4 == 11 & .x$DF == 41), c(T1.10Observed %>% pull(mean)),  "T1.10")
-aWP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 14 & .x$DF == 33), c(T1.9Observed %>% pull(mean)), "T1.9")
-aWP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == 16& .x$DF == 15), c(Zel11Observed %>% pull(mean)), "zel11")
-#WP4 = plotSoilResultsAgg(results$zel12 %>% keep(~.x$RSO4 == 5 & .x$DF == 5.5), c(Zel12Observed %>% pull(mean)), "zel12")
+aWP1 = plotSoilResultsAgg(results$s10 %>% keep(~.x$RSO4 == 12.5 & .x$DF == 5.5), c(T1.10Observed %>% pull(mean)),  "T1.10 - Shehoret")
+aWP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 15 & .x$DF == 7), c(T1.9Observed %>% pull(mean)), "T1.9 - Shehoret")
+aWP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == optimal[3,1] & .x$DF == 6), c(Zel11Observed %>% pull(mean)), "zel11 - Zeelim")
+res = rbind(aWP1[[2]], aWP2[[2]], aWP3[[2]])
+#WP4 = plotSoilResultsAgg(list(result), c(T2.1Observed  %>% pull(mean)), "T2.1")
 #WP5 = plotSoilResultsAgg(results$zel13 %>% keep(~.x$RSO4 == 4 & .x$DF == 3.5), c(Zel13Observed %>% pull(mean)), "zel13")
-ggarrange(aWP1,aWP2,aWP3,WP4,nrow = 2)
+plot_grid(aWP1, aWP2, aWP3, nrow = 2, legend = get_legend(aWP1),axis = "t")
 
-
+WP1 = plotSoilResultsSurface(CV ,"zel11")
+WP2 = plotSoilResultsSurface(CV , "T1.9")
+WP3 = plotSoilResultsSurface(CV , "T1.10")
+WP4 = plotSoilResultsSurface(CV ,c("zel11","T1.9","T1.10"))
+res = rbind(WP1[[2]], WP2[[2]], WP3[[2]],WP4[[2]])
 
 #i = 0;
 #for (item in 3:ncol(CV)) { i = i+1
