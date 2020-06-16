@@ -7,13 +7,13 @@ sdom = GET("https://api.ims.gov.il/v1/envista/stations/65/data/12/?from=1998/02/
 sdom = (fromJSON(content(sdom, as = "text")))
 tableSdomRaw = tibble(date = date(as.POSIXct(gsub("T", " ", sdom$data$datetime), tz = "GMT")), time = format(as.POSIXct(gsub("T", " ", sdom$data$datetime), tz = "GMT"), "%H:%M:%S"), value = sdom$data$channels %>% map_dbl(~.x$value)) %>% filter(value >= 0)
 tableSdom = tableSdomRaw  %>% filter(value > 0, year(date) >= 2000) %>% rowwise() %>% mutate(intens = value * 6, runoffRatioS1 = GBRunoff(value * 6, 1), runoffRatioS2 = GBRunoff(value * 6, 2), runoffRatioS3 = GBRunoff(value * 6, 3)) %>% mutate(totRunoffS1 = runoffRatioS1 * value, totRunoffS2 = runoffRatioS2 * value, totRunoffS3 = runoffRatioS3 * value) %>% ungroup() %>% filter(intens<72)
-tableElat = tableElat %>% arrange(desc(intens)) %>% tail(-2)
 
 
 elat = GET("https://api.ims.gov.il/v1/envista/stations/64/data/17?from=2002/11/29&to=2020/05/03", add_headers("Authorization" = "ApiToken f058958a-d8bd-47cc-95d7-7ecf98610e47"))
 elat = (fromJSON(content(elat, as = "text")))
 tableElatRaw = tibble(date = date(as.POSIXct(gsub("T", " ", elat$data$datetime))), time = format(as.POSIXct(gsub("T", " ", elat$data$datetime)), "%H:%M:%S"), value = elat$data$channels %>% map_dbl(~.x$value)) %>% filter(value >= 0)
 tableElat = tableElatRaw %>% filter(value > 0) %>% rowwise() %>% mutate(intens = value * 6, runoffRatioS1 = GBRunoff(value * 6, 1), runoffRatioS2 = GBRunoff(value * 6, 2), runoffRatioS3 = GBRunoff(value * 6, 3)) %>% mutate(totRunoffS1 = runoffRatioS1 * value, totRunoffS2 = runoffRatioS2 * value, totRunoffS3 = runoffRatioS3 * value) %>% ungroup() %>% filter(intens < 72)
+tableElat = tableElat %>% arrange(desc(intens)) %>% tail(-2)
 
 
 daily = tableElat %>% group_by(date) %>% summarise(daily = sum(value), Pleistocene.106k = sum(totRunoffS1), Pleistocene.31k = sum(totRunoffS2), Holocene.10k = sum(totRunoffS3), mean = mean(intens), max = max(intens), median = median(intens))
@@ -52,7 +52,7 @@ GBRunoff = function(intens, profile) {
 
 ageRainfunc = function(age, rain) {
     if (age>10000) {
-        runoff = (0.0546 * log(age) - 0.4956) * rain ^ 1.1
+        runoff = (0.027 * log(age) - 0.2212) * rain
     } else {
         runoff = 0;
     }

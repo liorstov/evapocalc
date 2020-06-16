@@ -95,7 +95,7 @@ double Compartment::solubility(double temp)
 
 	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
 
-	return C_CaSO4;
+	return (alphaGypsum < 0 ? -alphaGypsum : 0);
 }
 
 pair<double, double> Compartment::quadricEquation(double a, double b , double c)

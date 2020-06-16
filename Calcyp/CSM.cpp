@@ -52,7 +52,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	double DailyCaRain;
 	double inputCa = 0;
 	double outputCa = 0;
-	
+	double GypAgg = 0;
+	int year = 0;
 	int nWDComp = 0;
 	int nRainEvents = 0;
 	int nRainVecLength = rain.length();
@@ -103,6 +104,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	Rcpp::DoubleVector AETLoss = DoubleVector::create();
 	Rcpp::DoubleVector dayRain = DoubleVector::create();
 	Rcpp::DoubleVector WD (nNumOfDays);
+	Rcpp::DoubleVector YearGyp (years);
+	Rcpp::DoubleVector YearDust(years);
+	Rcpp::DoubleVector YearSulfate(years);
+	initVector(YearGyp);
+	initVector(YearDust);
+	initVector(YearSulfate);
+	
 	Gypsum.erase(0, Gypsum.length());
 	
 	Rcout.precision(10);
@@ -115,12 +123,14 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	//main loop over days
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
+		year = day / 365;
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
-		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration
+		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration to get mg sulfate, convert to gram and multiply by atomic mass, to get mol
 		DailyCaRain = nDailyRain * 0.001*rainCa / 1000 / 40.078F;// convert cm3 to littre and multiple with concentration
 
 		inputCa += DailyCaRain;
+		
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
@@ -144,11 +154,14 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		nTotalRain += nDailyRain;
 		Compartments[0].nMoist += nDailyRain;   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
 
+		YearDust[year] += nDailyDustGyp;
+
 		//accumolate dust and relaese when its raining 
 		if (nDailyRain > 0) {
 			Compartments[0].C_Ca +=  DailyCaRain;
 			Compartments[0].C_SO4 += DailySO4Rain;
 			Compartments[0].C_CaSO4 += accumolateDustDays * nDailyDustGyp;
+			YearSulfate[year] += DailySO4Rain;
 			accumolateDustDays = 0;
 		}
 		else
@@ -208,11 +221,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
 				
-		
+				GypAgg = Compartments[CurrentComp].solubility(nTemp);
+				
+				YearGyp[year] += mol2meqSoil(GypAgg, thick); 
 			}
 				//	myfile << day << "," << CurrentComp << "," << nDailyRain * 0.001 << "," << nDailyAET * 0.001 << "," << Compartments[CurrentComp].nMoist * 0.001 << "," << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) <<",";
 
-			Compartments[CurrentComp].solubility(nTemp);
+		
 		//	myfile << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) << endl;
 
 			
@@ -244,6 +259,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 			nTotalMoist += Compartments[CurrentComp].nMoist;
 		}
+
 
 		// Write to output
 		
@@ -323,7 +339,10 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		_["CompWash"] = CompWash,
 		_["Leachate"]= nTotalLeachate,
 		_["inputCa"]= inputCa,
-		_["outputCa"]= outputCa);
+		_["outputCa"]= outputCa,
+		_["YearGyp"] = YearGyp,
+		_["YearSulfate"] = YearSulfate,
+		_["YearDust"] = YearDust);
 
 	return results;
 }
@@ -399,6 +418,14 @@ void CSM::InitCompartments()
 	{
 		newCompartment = new Compartment(i, nArea, wieltingPoint, nFieldCapacity, thick, CCa, CSO4);
 		Compartments.push_back(*newCompartment);
+	}
+}
+
+void CSM::initVector(Rcpp::DoubleVector & inputVector)
+{
+	for (R_xlen_t i = 0; i < inputVector.length(); i++)
+	{
+		inputVector[i] = 0;
 	}
 }
 

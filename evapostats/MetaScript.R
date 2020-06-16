@@ -1,5 +1,6 @@
 
 load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
+load("C:/Users/liorst/Source/Repos/evapocalc/synth.RData")
 load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList.RData")
 
 require(tidyverse)
@@ -13,25 +14,31 @@ require(gganimate)
 require(pbapply)
 require(metR)
 require(ggpmisc)
-theme_set(theme_classic() + theme(legend.key.size = unit(2, "picas"), legend.text = element_text(size = 25), legend.title = element_blank(),
+require(akima)
+require(rPref)
+theme_set(theme_classic() + theme(legend.key.size = unit(1, "line"), legend.text = element_text(size = 25),
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
 axis.text.y = element_text(size = 28),
 axis.title.y = element_text(size = 35),
 axis.title.x = element_text(size = 35),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
-panel.border = element_rect(colour = "black", fill = NA, size = 0)))
+panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 10)))
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
 #set wd 
 setwd("C:/Users/liorst/source/repos/evapocalc");
 
+
 source("evapostats/Functions.R");
 source("evapostats/PETGen.R");
 source("evapostats/RainGen.R");
+loadObsProfiles()
+
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
 b <<- new(CSMCLASS);
 
+#rain gen ----
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
@@ -51,17 +58,16 @@ pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), 
 print(results);
 dev.off()
 
-
-
-result = CalcGypsum(SynthRainE, 100, plotRes = 0, Depth = 100, wieltingPoint = 0.013, thick = 5, verbose = 1, dustFlux = 5, rainSO4 = 15);
+#----
+#tests----
+result = CalcGypsum(SynthRainE, 60000, plotRes = 0, Depth = 150, wieltingPoint = 0.013, thick = 5, verbose = 0, dustFlux = 6, rainSO4 = 15);
 plotAnimation(result)
 ggplot(bla %>% gather("index", "value", - cent), aes(cent, value, color = index)) + geom_line() + geom_smooth(method = "lm", size = 2) + labs(x = "century [-]", y = "80th perc. of seasonal WD[cm]") + scale_x_continuous(breaks = seq(0, 700, by = 100))
 plotSoilResults(result)
-bla2 = result$WD
+bla = result$WD
 paint = bla %>% dplyr::select(WithRunoff = p80, - mean, cent) %>% left_join(bla2 %>% dplyr::select(NoRunoff = p80 , -mean, cent), by = "cent")
 bla = result$WD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), std = sd(WD)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(std));
 
-#sandbox
 
 kiki1 = SynthRainE %>% filter(year == 1550, dayIndex >= 160 & dayIndex <= 161)
 
@@ -71,8 +77,8 @@ taliRain = as_tibble(taliRain$data) %>% dplyr::select(year = V1, dayIndex = V2, 
 taliRain %>% group_by(year) %>% summarise(a = sum(rain), sum(rain)) %>% summarise(mean(a))
 
 taliRain = as_tibble(taliRain) %>% left_join(SynthRain  %>% filter(year<=500)%>% dplyr::select(myRain = rain, dayIndex, year, PET, - K, - SeriesNumber), by = c("year", "dayIndex"))
-
-#Test real rain
+#----
+#Test real rain----
 IMSRain$year = IMSRain$waterYear %% IMSRain$waterYear[1] + 1
 IMSRainTest = IMSRain %>% left_join(SynthRain %>% dplyr::select(-rain) %>% filter(year <= max(IMSRain$year)), by = c("dayIndex", "year"))
 
@@ -84,7 +90,36 @@ gc(reset = TRUE)
 
 #----
 
+#evapo sensitivity----
+evapo = seq(0.8, 1.2, by = 0.1) * 1.2;
+WP = seq(0.8, 1.2, by = 0.1) * 0.013;
+FC = seq(0.8, 1.2, by = 0.1) * 0.1;
+evapo = as.matrix(bind_rows(crossing(evapo = evapo, WP = 0.013, FC = 0.1, rep = 1:15), crossing(evapo = 1.2, WP, FC = 0.1, rep = 1:15), crossing(evapo = 1.2, WP = 0.013, FC, rep = 1:15)))
 
+resultsT1.10.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), AETFactor = evapo[X, 1], wieltingPoint = evapo[X, 2], FieldCapacity = evapo[X,3]))
+resultsT1.9.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), AETFactor = evapo[X, 1], wieltingPoint = evapo[X, 2], FieldCapacity = evapo[X, 3]));
+resultsZel11.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), AETFactor = evapo[X, 1], wieltingPoint = evapo[X, 2], FieldCapacity = evapo[X, 3]));
+
+RMSD.T.10 = ResultsTargetFunction(resultsT1.10.par, c(T1.10Observed %>% pull(mean)))  %>% unnest()
+RMSD.T.9 = ResultsTargetFunction(resultsT1.9.par, c(T1.9Observed %>% pull(mean)))  %>% unnest()
+RMSD.zel11 = ResultsTargetFunction(resultsZel11.par, c(Zel11Observed %>% pull(mean)))  %>% unnest()
+AETFTable = bind_rows(RMSD.T.10, RMSD.zel11, RMSD.T.9)
+AETFTable %>% ggplot(aes(y = diffs / comps, x = AETF)) + geom_boxplot(aes(group = AETF)) + geom_point()
+#
+#WP sensitivity----
+WP = seq(0.9, 1.4, by = 0.1);
+evapo = as.matrix(crossing(evapo, 1:15))
+
+resultsT1.10.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), AETFactor = evapo[X,1]))
+resultsT1.9.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), AETFactor = evapo[X, 1]));
+resultsZel11.par = lapply(1:nrow(evapo), function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), AETFactor = evapo[X, 1]));
+
+RMSD.T.10 = ResultsTargetFunction(resultsT1.10.par, c(T1.10Observed %>% pull(mean)))  %>% unnest()
+RMSD.T.9 = ResultsTargetFunction(resultsT1.9.par, c(T1.9Observed %>% pull(mean)))  %>% unnest()
+RMSD.zel11 = ResultsTargetFunction(resultsZel11.par, c(Zel11Observed %>% pull(mean)))  %>% unnest()
+AETFTable = bind_rows(RMSD.T.10, RMSD.zel11, RMSD.T.9)
+AETFTable %>% ggplot(aes(y = diffs / comps, x = AETF)) + geom_boxplot(aes(group = AETF)) + geom_point()
+#
 
 
 
@@ -140,14 +175,17 @@ T2.1Observed = observedProfiles %>% filter(str_detect(SiteName, "T2-1$"))
 
 
 FCarray = seq(0.02, 0.3, by = 0.01);
-RainArr = seq(10, 15, by = 1);
-DustArr = c(seq(6,100, by = 1));
-repetition = 1:6
+RainArr = seq(15, 15, by = 3);
+DustArr = c(seq(0,3000, by = 50));
+repetition = 1:1
 rainDustArray = as.matrix(crossing(RainArr, DustArr, repetition))
 nrow(rainDustArray)
 #par computation----
 source("evapostats/parallel.R");
-
+RateTest = list()
+RateTest = c(RateTest, lapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 100, plotRes = 0, Depth = 100, DustGyp=0.005,dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1])))
+save(RateTest, file =  "rateResults.Rdata")
+bla = plotRate(RateTest)  + coord_cartesian(ylim = c())
 
  CVSHOnly= CV %>% filter(str_detect(profile, "T"));
 
@@ -170,6 +208,7 @@ ggarrange(WP2, WP1,nrow=1)
 aWP1 = plotSoilResultsAgg(results$s10 %>% keep(~.x$RSO4 == 12.5 & .x$DF == 5.5), c(T1.10Observed %>% pull(mean)),  "T1.10 - Shehoret")
 aWP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 15 & .x$DF == 7), c(T1.9Observed %>% pull(mean)), "T1.9 - Shehoret")
 aWP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == optimal[3,1] & .x$DF == 6), c(Zel11Observed %>% pull(mean)), "zel11 - Zeelim")
+aWP3 = plotSoilResultsAgg(bla, c(T1.1Observed[1:20,] %>% pull(mean)), "zel11 - Zeelim")
 res = rbind(aWP1[[2]], aWP2[[2]], aWP3[[2]])
 #WP4 = plotSoilResultsAgg(list(result), c(T2.1Observed  %>% pull(mean)), "T2.1")
 #WP5 = plotSoilResultsAgg(results$zel13 %>% keep(~.x$RSO4 == 4 & .x$DF == 3.5), c(Zel13Observed %>% pull(mean)), "zel13")
@@ -181,12 +220,6 @@ WP3 = plotSoilResultsSurface(CV , "T1.10")
 WP4 = plotSoilResultsSurface(CV ,c("zel11","T1.9","T1.10"))
 res = rbind(WP1[[2]], WP2[[2]], WP3[[2]],WP4[[2]])
 
-#i = 0;
-#for (item in 3:ncol(CV)) { i = i+1
-    #headline = CV %>% mutate(s = sqrt(rowSums(.[, c(-1, -2, - as.integer(item))]) / (CVn %>% mutate(den = rowSums(.[, c(-1, -2, - as.integer(item))])) %>% pull(den)))) %>%
-            #arrange(s) %>% head(1)
-    #CVRes[i] = (sqrt(headline %>% pull(item) / CVn[1, item]))
-#}
 
 dustsens = CV %>% filter(round(dust,2) %in% c(5, 6, 7)&rain == 13) %>% group_by(par = dust) %>% summarise(value = joinRMSD(mean, n))
 rainsens = CV %>% filter(round(rain,2) %in% c(10.4,13,15.6)&dust==6) %>% group_by(par=rain) %>% summarise(value = joinRMSD(mean, n))
