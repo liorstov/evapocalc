@@ -50,4 +50,3 @@ RMSD.Zel11 = ArrangeAndCompare(results$zel11, c(Zel11Observed %>% pull(mean))) %
 CV = RMSD.T.10 %>% left_join(RMSD.T1.9, by = c("rain", "dust")) %>% left_join(RMSD.Zel11, by = c("rain", "dust")) %>%
     gather("profile", "value", - rain, - dust) %>% unnest()# %>% rowwise() %>% mutate(minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% ungroup() %>% mutate(site = if_else(str_detect(profile, "zel"), "Zel", "SH"))
 
-resave

@@ -7,6 +7,7 @@ require(fitdistrplus)
 require(egg)
 library(lubridate)
 require(pracma)
+require(cowplot)
 
 
 getDayAmount = function(dayIndex, Random, WetAfterDry, WetAfterWet, PrevDayAmount) {
@@ -143,7 +144,7 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain)
 
    
     #dividing the sim series to grups 
-    SynthRain$SeriesNumber = rep(1:NumOfSeries, each = measuredYears*365)
+    SynthRain = SynthRain %>% mutate(SeriesNumber = (year - 1) %/% measuredYears + 1)
 
     return(list(SynthRain = SynthRain, DaysProb = DaysProb))
     #---
@@ -164,10 +165,10 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     plotLimit = 365;
     histBreaksSize = 1;
     #hist for observed
-    IMSRainDay = IMSRain %>% mutate(wet = (rain > 0) * 1) %>% group_by(dayIndex) %>% summarise(observed = sum(wet) / measuredYears)
+    IMSRainDay = IMSRain %>% mutate(wet = (rain > 0.1) * 1) %>% group_by(dayIndex) %>% summarise(observed = sum(wet) / measuredYears)
     #hist for simulated
 
-    SimRainDay = SynthRain %>% mutate(wet = (rain > 0) * 1) %>% group_by(dayIndex, SeriesNumber) %>% summarise(density = sum(wet) / measuredYears)
+    SimRainDay = SynthRain %>% mutate(wet = (rain > 0.1) * 1) %>% group_by(dayIndex, SeriesNumber) %>% summarise(density = sum(wet) / measuredYears)
     SimRainDay = SimRainDay %>% group_by(dayIndex) %>%
                 summarise(Simulated = mean(density), min = quantile(density, 0.05), median = quantile(density, 0.5), max = quantile(density, 0.95)) %>%
                     add_column(month = (dmy("1-09-2000") + 0:364)) %>% left_join(IMSRainDay, by = "dayIndex") %>%
@@ -223,7 +224,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     plotLimit = max(simRainAnn$WetDays);
     histBreaksSize = 1;
     #histogram for observed
-    IMSAnnWetDays = hist(IMSRainAnn$WetDays, breaks = seq(-2, plotLimit, histBreaksSize), plot = 0) %>%
+    IMSAnnWetDays = hist(IMSRainAnn$WetDays, breaks = seq(0, plotLimit, histBreaksSize), plot = 0) %>%
                         Hist2tibble() %>% rename(observed = density)
 
     #histogram for simulated
@@ -240,7 +241,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
                                 geom_line(aes(y = observed, color = "Measured")) +
                                 geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) + xlab("# Annual wet days") +
                                      scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(breaks = seq(0, plotLimit, 5), expand = c(0, 0));
-    print("60%")
+    print("40%")
 
    
     #--
@@ -272,6 +273,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
             ylab("PET STD [mm / day]") + xlab("") +
             scale_x_date(date_labels = "%B", expand = c(0, 0), label = "") + scale_y_continuous(expand = c(0, 0.0)) + 
             geom_line(aes(group = K, y = smoothSTD, color = as.factor(paste(K))))
+        print("60%")
 
         #--
         #PET density----

@@ -45,8 +45,8 @@ LOOCV = function(CV) {
 }
 
 CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, wieltingPoint = 0.013,
-                         nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1.16, plotRes = TRUE,
-                        verbose = FALSE, rainCa = 35.58, dustFlux = 5, rainSO4 = 15, Random = TRUE, obs = NULL) {
+                         nArea = 1, FieldCapacity = 0.1, DustGyp = 0.005, AETFactor = 1.16, plotRes = FALSE,
+                        verbose = FALSE, rainCa = 35.58, dustFlux = 5, rainSO4 = 15, Random = TRUE, obs = NULL,getWD = T) {
 
 
     #require(dplyr)
@@ -62,28 +62,31 @@ CalcGypsum <- function(raindata = SynthRain, duration, Depth = 100, thick = 5, w
                    DustGyp, AETFactor, verbose, dustFlux / 10000 / 365, rainCa, rainSO4);
     tictoc::toc()
     list$thick = thick;
-    yearly = raindata %>% group_by(year) %>% summarise(yearlyRain = sum(rain), RainDays = length(which(rain > 0)), meanYear = mean(rain), RMSD = sd(rain));
-    list$YearlyRain = yearly %>% pull(yearlyRain);
-    list$RainDays = yearly %>% pull(RainDays);
-    list$meanYear = yearly %>% pull(meanYear);
-    list$RMSD = yearly %>% pull(RMSD);
+
+    if (!getWD) {list$WD = NULL }
+
+    #yearly = raindata %>% group_by(year) %>% summarise(yearlyRain = sum(rain), RainDays = length(which(rain > 0)), meanYear = mean(rain), RMSD = sd(rain));
+    #list$YearlyRain = yearly %>% pull(yearlyRain);
+    #list$RainDays = yearly %>% pull(RainDays);
+    #list$meanYear = yearly %>% pull(meanYear);
+    #list$RMSD = yearly %>% pull(RMSD);
 
     DayWD = dplyr::as_tibble(list$WD) %>% rowid_to_column(var = "day") %>% mutate(WD = value)
-    list$Index30 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.3))), thick = thick);
-    list$Index03 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.03))), thick = thick);
-    list$WDp80 = round(quantile(DayWD$WD, 0.8), 2);
-    list$meanWD = round(mean(DayWD$WD), 2);
+    #list$Index30 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.3))), thick = thick);
+    #list$Index03 = comp2Depth(which.min(abs(list$CompWash - (list$totalRain * 0.03))), thick = thick);
+    #list$WDp80 = round(quantile(DayWD$WD, 0.8), 2);
+    #list$meanWD = round(mean(DayWD$WD), 2);
 
-    #seasonal indices
+    ##seasonal indices
     Seasonal = DayWD %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(WD = max(WD))
     list$SMeanWD = round(mean(Seasonal$WD), 2);
     list$SWDp80 = round(quantile(Seasonal$WD, 0.8), 2);
 
-    list$WD = DayWD %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
-    list$maxWD = max(DayWD$WD);
+    #list$WD = DayWD %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
+    #list$maxWD = max(DayWD$WD);
 
-    DayGyp = dplyr::as_tibble(list$gypsumDay);
-    list$gypsumDay = DayGyp %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
+    #DayGyp = dplyr::as_tibble(list$gypsumDay);
+    #list$gypsumDay = DayGyp %>% mutate(day = day + 1, year = (day + 1) %/% 365 + 1);
     list$waterBalance = list$totalRain - sum(list$AETLoss);
     list$duration = duration;
     list$FC = FieldCapacity;
@@ -108,9 +111,11 @@ loadObsProfiles = function() {
     Zel11Observed <<- observedProfiles %>% filter(str_detect(SiteName, "11"))
     Zel12Observed <<- observedProfiles %>% filter(str_detect(SiteName, "12"))
     Zel13Observed <<- observedProfiles %>% filter(str_detect(SiteName, "13"))
+    Zel1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL1$"))
+    Zel2Observed <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL2$"))
     T1.9Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
     T1.10Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
-    T1.1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-1"))
+    T1.1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-1$"))
     T2.1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T2-1$"))
 }
 comp2Depth = function(comp, thick) {
@@ -118,7 +123,7 @@ comp2Depth = function(comp, thick) {
 }
 plotSoilResults = function(res, observed = NULL) {
     resLeach = tibble(leachate = res$CompWash, wetZone = res$WetZone / res$duration) %>% rowid_to_column %>%
-                        mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * res$thick, calculated = res$gypsum, observed) %>%
+                        mutate(WaterFluxOut = leachate / res$totalRain, depth = (rowid - 0.5) * res$thick, calculated = res$gypsum, observed = observed$mean) %>%
                         dplyr::select(depth, calculated, observed) %>% gather("factor", "gypsum", - depth)
 
     WP1 = ggplot(resLeach, aes(x = depth, y = gypsum, fill = factor)) + scale_x_reverse(expand = c(0, 0.0)) + coord_flip(ylim = NULL) +
@@ -184,7 +189,7 @@ ResultsTargetFunction = function(res, obs) {
 
     meanOBS = mean(obs);
     #calculate target function
-    rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, AETF = .x$AETF, WP = .x$WP, dust = .x$DF, value = difference(.x$gypsum, obs), diffs = diffs(.x$gypsum, obs), PickConc = PickConc(.x$gypsum, obs), PickDepth = .x$thick * PickDepth(.x$gypsum, obs), comps = length(obs)))) 
+    rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, AETF = .x$AETF,FC = .x$FC, WP = .x$WP, dust = .x$DF, value = difference(.x$gypsum, obs), diffs = diffs(.x$gypsum, obs), PickConc = PickConc(.x$gypsum, obs), PickDepth = .x$thick * PickDepth(.x$gypsum, obs), comps = length(obs)))) 
     #group_by(AETF) %>% summarise(mean = mean(value), min = quantile(value, 0.05), max = quantile(value, 0.95), meanOBS, sd = sd(value), n = n(), comps = sum(comps), diffs = sum(diffs), PickDepth = mean(PickDepth), PickConc = mean(PickConc), minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% nest(value = c(mean, min, max, comps, n, meanOBS, sd, diffs, PickDepth, PickConc, minRMSD, meanRMSD, maxRMSD, normRMSD))
     return(rmsdTable)
 
@@ -344,4 +349,17 @@ ageRainfunc = function(age, rain) {
     runoff = (0.027 * log(age) - 0.2212) * rain;
 
     return(rain - runoff);
+}
+
+AlternativeWeibullE = function(mean) {
+    fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.4257)) - mean };
+    scale = fzero(fun, c(1,3))[[1]];
+    shape = 0.2 * log(scale) + 0.4257;
+    return(list(scale = scale,shape=shape))
+}
+AlternativeWeibullS = function(mean) {
+    fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.5042)) - mean };
+    scale = fzero(fun, c(1, 3))[[1]];
+    shape = 0.2 * log(scale) + 0.5042;
+    return(list(scale = scale, shape = shape))
 }
