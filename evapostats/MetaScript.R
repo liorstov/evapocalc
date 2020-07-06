@@ -1,5 +1,5 @@
 
-load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
+#load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
 load("C:/Users/liorst/Source/Repos/evapocalc/synth.RData")
 load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList.RData")
 
@@ -43,7 +43,7 @@ b <<- new(CSMCLASS);
 #stationElatEvap = 347704;
 #stationSedom = 337000;
 IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
-rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain);
+rainSeriesResults = GenerateSeries(NumOfSeries = 1000, IMSRain = IMSRain, AnuualRain = 80, WetDays = 18.2);
 PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
 
 SynthRain = rainSeriesResults$SynthRain;
@@ -57,16 +57,17 @@ results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults
 pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), width = 30, height = 16);
 print(results);
 dev.off()
-
+SynthRain %>% filter(rain > 0) %>% summarise(mean(rain))
+SynthRain %>% filter(rain > 0) %>% group_by(year) %>% summarise(n = n()) %>% summarise(mean(n))
 #catch observed----
 loadObsProfiles()
 
 
 #tests---
-result = CalcGypsum(SynthRainE, 62400, plotRes = 0, Depth = 250);
+result = CalcGypsum(SynthRain, 62400, plotRes = 0, Depth = 250, rainSO4 = 20, AETFactor = 1.2);
+plotSoilResults(result, T1.1Observed)
 plotAnimation(result)
 ggplot(bla %>% gather("index", "value", - cent), aes(cent, value, color = index)) + geom_line() + geom_smooth(method = "lm", size = 2) + labs(x = "century [-]", y = "80th perc. of seasonal WD[cm]") + scale_x_continuous(breaks = seq(0, 700, by = 100))
-plotSoilResults(result, T1.1Observed)
 bla = result$WD
 paint = bla %>% dplyr::select(WithRunoff = p80, - mean, cent) %>% left_join(bla2 %>% dplyr::select(NoRunoff = p80 , -mean, cent), by = "cent")
 bla = result$WD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), std = sd(WD)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(std));

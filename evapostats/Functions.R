@@ -353,13 +353,13 @@ ageRainfunc = function(age, rain) {
 
 AlternativeWeibullE = function(mean) {
     fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.4257)) - mean };
-    scale = fzero(fun, c(1,3))[[1]];
+    scale = fzero(fun, c(1,11))[[1]];
     shape = 0.2 * log(scale) + 0.4257;
     return(list(scale = scale,shape=shape))
 }
 AlternativeWeibullS = function(mean) {
     fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.5042)) - mean };
-    scale = fzero(fun, c(1, 3))[[1]];
+    scale = fzero(fun, c(1, 10))[[1]];
     shape = 0.2 * log(scale) + 0.5042;
     return(list(scale = scale, shape = shape))
 }

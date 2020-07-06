@@ -107,7 +107,7 @@ GetImsRain = function(station = 347700 ,stationEvap = 347704) {
 
     return(IMSRain)
 }
-GenerateSeries = function(NumOfSeries = 1000, IMSRain)
+GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays = 0)
 {
     DaysProb = CalculateProbabilities(IMSRain);    
     DepthLimit = 0.1
@@ -115,18 +115,29 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain)
     #weibull parameters are taken for francesco
     station <<- getStationParam(IMSRain$station[1])
     stationName <<- station$stationName;
-    
+    shape = station$shape;
+    scale = station$scale;
+
     numOfyears <<- measuredYears * NumOfSeries
     #create the synthetic rain series and pick random values for occurance and possible amount from weibull
     #rain generator ---
     print("Calculating rain:")
     tic()
+    if (AnuualRain != 0 & WetDays != 0) {
+        if (stationName == "Eilat") {
+            AltWB = AlternativeWeibullE(AnuualRain / WetDays);
+        } else {
+            AltWB = AlternativeWeibullS(AnuualRain / WetDays);
+        }
+        shape = AltWB$shape;
+        scale = AltWB$scale;
+    }
 
     #create matrix with weibull values for depth
-    weibull = matrix(rweibull(365 * numOfyears, station$shape, station$scale) + DepthLimit, nrow = numOfyears, ncol = 365);
+    weibull = matrix(rweibull(365 * numOfyears, shape, scale) + DepthLimit, nrow = numOfyears, ncol = 365);
 
     #matrix with random values 
-    randMat = matrix(runif(365 * numOfyears), nrow = numOfyears, ncol = 365);
+    randMat = matrix(runif(365 * numOfyears)*0.6, nrow = numOfyears, ncol = 365);
     SynthRain = matrix(0, nrow = numOfyears, ncol = 365, dimnames = list(1:numOfyears, 1:365))
     
     for (days in 2:ncol(SynthRain)) {
@@ -356,7 +367,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     toc()
 
    # return(ggarrange(p1, rainProbabilities, p2, p3, p6, p4,  p7,p5, PETProbabilities))
-    return(plot_grid(p1 + theme(legend.position = "none"), p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), p4 + theme(legend.position = "none"), p5 + theme(legend.position = "none"), get_legend(p1), rel_widths = c(1, 0, 1)))
+    return(ggarrange(p1 + theme(legend.position = "none"), p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), p4 + theme(legend.position = "none"), p5 + theme(legend.position = "none"), get_legend(p1), rel_widths = c(1, 0, 1)))
    
   
   
