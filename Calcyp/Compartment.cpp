@@ -54,7 +54,7 @@ double Compartment::solubility(double temp)
 	a_So4 = MSo4 * ionActivity;
 	a_CaSo4 = MCaSO4 * ionActivity;
 	
-	// omega is the difference between current product and equil product
+	// omega is the sqrDiff between current product and equil product
 	//Ω > 1 - supersaturated solution, and Ω < 1 - undersaturated solution
 	GypOmega =  a_Ca * a_So4/Ksp;
 // the concentration we need to add or substract to gypsum

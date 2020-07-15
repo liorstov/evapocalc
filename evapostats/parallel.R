@@ -1,9 +1,8 @@
 require(parallel)
-rm(results)
 load("synth.RData")
 cl <- makeCluster(6, type = "PSOCK")
 
-clusterExport(cl, c("Zel11Observed", "Zel12Observed", "Zel13Observed", "T1.9Observed", "T1.10Observed", "rainDustArray"))
+clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1Observed","T1.1Observed"))
 
 clusterEvalQ(cl, {
     require(tidyverse)
@@ -16,37 +15,59 @@ clusterEvalQ(cl, {
     b <<- new(CSMCLASS);
     source("C:/Users/liorst/source/repos/evapocalc/evapostats/Functions.R", encoding = "Windows-1252")
 })
+
 clusterExport(cl, "SynthRainE")
-rm("SynthRainE")
-gc()
-clusterEvalQ(cl, ls())
-tic()
-resultsT1.10.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsT1.9.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-clusterEvalQ(cl, { rm("SynthRainE"); gc(); })
 clusterExport(cl, "SynthRainS")
-rm("SynthRainS")
-gc()
-resultsZel11.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-#resultsZel12.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel12Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsZel12.par = list();
+tic()
+
+days = 9:20;
+annual =  seq(20, 80, by = 10);
+array = tibble(crossing(days, annual),mean = annual/days) %>% filter(mean>=3 & mean <= 11)
+
+for (i in 1:1) {
+    print(array[i,])
+
+    IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
+    rainSeriesResults = GenerateSeries(NumOfSeries = 900, IMSRain = IMSRain, AnuualRain = array$annual[i], WetDays = array$days[i]) 
+
+    PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain, 30);
+    SynthRain = rainSeriesResults$SynthRain;
+    SynthRain$PET = PETresults$SynthPET;
+    SynthRain$K = PETresults$K;
+    PETProb = PETresults$PETProb;
+    rainProb = rainSeriesResults$DaysProb;
+    SynthRain = SynthRain %>% arrange(year, dayIndex);
+
+    clusterExport(cl, "SynthRain")
+    
+    clusterEvalQ(cl, ls())
+  
+    results$T2.1 = c(results$T2.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62100, plotRes = 0, Depth = tail(T2.1Observed$bottom, 1))))
+    results$T1.1 = c(results$T1.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62400, plotRes = 0, Depth = tail(T1.1Observed$bottom, 1))))
+    results$T1.9 = c(results$T1.9, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRain, duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1))))
+    results$T1.10 = c(results$T1.10, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRain, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1))))
+
+   # results$zel11 = c(results$zel11,parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1))))
+   
+}
 toc()
-#resultsZel13.par = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, duration = 3000, plotRes = 0, Depth = tail(Zel13Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
-resultsZel13.par = list();
-save(list = c("resultsT1.10.par", "resultsT1.9.par", "resultsZel11.par"), file = "test8.RData")
-stopCluster(cl)
-load(file = "resultsList.RData")
-#combine results from different calculations
-results = list(s10 = resultsT1.10.par, s9 = resultsT1.9.par, zel11 = resultsZel11.par, zel12 = resultsZel12.par, zel13 = resultsZel13.par) %>% map2(results, append)
 save(results, file = "resultsList.RData")
 
-RMSD.T.10 = ArrangeAndCompare(results$s10, c(T1.10Observed %>% pull(mean))) %>% rename(T1.10 = value)
-RMSD.T1.9 = ArrangeAndCompare(results$s9, c(T1.9Observed %>% pull(mean))) %>% rename(T1.9 = value)
-RMSD.Zel11 = ArrangeAndCompare(results$zel11, c(Zel11Observed %>% pull(mean))) %>% rename(zel11 = value)
-#RMSD.Zel12 = ArrangeAndCompare(results$zel12, c(Zel12Observed %>% pull(mean))) %>% rename(zel12 = value)
-#RMSD.Zel13 = ArrangeAndCompare(results$zel13, c(Zel13Observed %>% pull(mean))) %>% rename(zel13 = value)
+stopCluster(cl)
+
+future::plan(multiprocess)
+CV = bind_rows(
+    RMSD.T.10 = RectanglingResults(results$T1.10, c(T1.10Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.10",isHolocene = T),
+    RMSD.T1.9 = RectanglingResults(results$T1.9, c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9" ,isHolocene = T),
+    RMSD.Zel11 = RectanglingResults(results$zel11, c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
+    RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
+    RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F)
+)
+future::plan(strategy = sequential)
+
 #---
 #join all profiles
 CV = RMSD.T.10 %>% left_join(RMSD.T1.9, by = c("rain", "dust")) %>% left_join(RMSD.Zel11, by = c("rain", "dust")) %>%
     gather("profile", "value", - rain, - dust) %>% unnest()# %>% rowwise() %>% mutate(minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% ungroup() %>% mutate(site = if_else(str_detect(profile, "zel"), "Zel", "SH"))
 
+plotSoilResultsAgg(results$T1.1[[51]], c(T1.1Observed %>% pull(mean)))

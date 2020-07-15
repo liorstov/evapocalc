@@ -134,3 +134,14 @@ p5 = ggplot(DailyPETE %>% left_join(DailyPETS, by = "breaks"), aes(x = breaks)) 
                                  scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(limits = c(0, plotLimit), expand = c(0, 0));
 
 
+
+res = 0
+for (item in 1:length(results[[1]])) {
+    #if (is.na(results[[1]][[item]]$FC)) {
+        ##results[[1]][[item]] = results[[1]][[item]] %>% update_list(AETF = 1.2)
+        #res = 1;
+    #}
+    results[[1]][[item]]$rainDays = as.numeric(results[[1]][[item]]$FC)
+}
+
+results = results%>% modify_depth(2,~list_modify(.x, rainDays = NA, AnnualRain = NA))

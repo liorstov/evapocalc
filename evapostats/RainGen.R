@@ -131,13 +131,16 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays =
         }
         shape = AltWB$shape;
         scale = AltWB$scale;
+        factor = 4.743 * WetDays^-0.711
     }
+
+
 
     #create matrix with weibull values for depth
     weibull = matrix(rweibull(365 * numOfyears, shape, scale) + DepthLimit, nrow = numOfyears, ncol = 365);
 
     #matrix with random values 
-    randMat = matrix(runif(365 * numOfyears)*0.6, nrow = numOfyears, ncol = 365);
+    randMat = matrix(runif(365 * numOfyears)*factor, nrow = numOfyears, ncol = 365);
     SynthRain = matrix(0, nrow = numOfyears, ncol = 365, dimnames = list(1:numOfyears, 1:365))
     
     for (days in 2:ncol(SynthRain)) {
@@ -357,9 +360,10 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     }
 
   
-    p6 = ggplot(tibble(values = rweibull(100000, station$shape, station$scale))) +
-            stat_density(aes(values, color = paste("Weibull\nScale =", station$scale, "\nShape = ", station$shape)), size = 1, geom = "line") +
-               scale_y_continuous(expand = c(0, 0.0)) + scale_x_log10(limits = c(0.001, 1000), expand = c(0, 0)) + labs(x = "", y = "pdf");
+    p6 = ggplot(tibble(values1 = rweibull(100000, 0.2, 4.5), values2 = rweibull(100000, station$shape, station$scale))) +
+            stat_density(aes(values1, color = paste("Weibull\nScale =", 3.292875, "\nShape = ", 0.6640522)), size = 1, geom = "line") +
+            stat_density(aes(values2, color = paste("Weibull\nScale =", station$shape, "\nShape = ", station$scale)), size = 1, geom = "line")+
+               scale_y_continuous(expand = c(0, 0.0)) + scale_x_continuous(trans = 'log10', expand = c(0, 0), labels = scales::trans_format("log10", math_format(10 ^ .x))) + labs(x = "", y = "pdf");
 
     
 
@@ -367,7 +371,7 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
     toc()
 
    # return(ggarrange(p1, rainProbabilities, p2, p3, p6, p4,  p7,p5, PETProbabilities))
-    return(ggarrange(p1 + theme(legend.position = "none"), p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), p4 + theme(legend.position = "none"), p5 + theme(legend.position = "none"), get_legend(p1), rel_widths = c(1, 0, 1)))
+    return(ggarrange(p1 + theme(legend.position = "none"), p2 + theme(legend.position = "none"), p3 + theme(legend.position = "none"), p4 + theme(legend.position = "none"), p5 + theme(legend.position = "none")))
    
   
   
@@ -376,4 +380,17 @@ plotResults = function(SynthRain, IMSRain, rainProb, PETProb, withEvapo = FALSE)
 
 waterYearDayToMonth = function(day) {
     monthIndex = day %% 30
+}
+
+AlternativeWeibullE = function(mean) {
+    fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.4257)) - mean };
+    scale = fzero(fun, c(1, 11))[[1]];
+    shape = 0.2 * log(scale) + 0.4257;
+    return(list(scale = scale, shape = shape))
+}
+AlternativeWeibullS = function(mean) {
+    fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.5042)) - mean };
+    scale = fzero(fun, c(1, 10))[[1]];
+    shape = 0.2 * log(scale) + 0.5042;
+    return(list(scale = scale, shape = shape))
 }
