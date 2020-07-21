@@ -18,17 +18,23 @@ require(akima)
 require(rPref)
 require(soilptf)
 require(furrr)
+require(future.apply)
 
+opt.AETF = 1.2;
+opt.WP = 0.013;
+opt.FC = 0.1;
+opt.sulfate = 13;
+opt.dust = 6;
 
 theme_set(theme_classic() + theme(legend.key.size = unit(1, "line"), legend.text = element_text(size = 25),
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
 strip.text = element_text( size = 20),
 axis.text.y = element_text(size = 28),
-axis.title.y = element_text(size = 35),
+axis.title.y = element_text(size = 28, margin = margin(t = 0, r = 10, b = 0, l = 0)), axis.text.y.right = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
 axis.title.x = element_text(size = 35),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
-panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 10)))
+panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 10)));
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
 #set wd 
@@ -94,7 +100,8 @@ result = CalcGypsum(rainHolocene = SynthRainE, rainPleistocene = SynthRain, 6210
 plotSoilResults(result, T2.1Observed)
 bla = result$WD %>% group_by(milen = year %/% 1000) %>% summarise(max = max(meanWD), std = sd(meanWD), mean = mean(meanWD))
 
-ggplot(bla, aes(milen*1000, mean)) + geom_line() + geom_smooth(method = "loess", size = 2) + labs( y = "mean of seasonal WD[cm]") + scale_y_reverse()
+ggplot(bla, aes(milen * 1000, mean)) + geom_line(size = 4, color = "blue") +
+labs(y = "Mean of seasonal WD[cm]", x = "Soil age [yr]") + scale_y_reverse() + geom_smooth(method = "gam", size = 2,color = "gray2") 
 
 save(resultsT1.1.par, file = "resultsPleis.RData")
 
@@ -108,19 +115,11 @@ taliRain %>% group_by(year) %>% summarise(a = sum(rain), sum(rain)) %>% summaris
 taliRain = as_tibble(taliRain) %>% left_join(SynthRain  %>% filter(year<=500)%>% dplyr::select(myRain = rain, dayIndex, year, PET, - K, - SeriesNumber), by = c("year", "dayIndex"))
 
 #aggregateReuslts---
-future::plan(multiprocess)
-CV = bind_rows(
-    RMSD.T.10 = RectanglingResults(results$T1.10, c(T1.10Observed %>% pull(correctedMean))) %>% dplyr::mutate(profile = "T1.10", isHolocene = T),
-    RMSD.T1.9 = RectanglingResults(results$T1.9, c(T1.9Observed %>% pull(correctedMean))) %>% dplyr::mutate(profile = "T1.9", isHolocene = T),
-    RMSD.Zel11 = RectanglingResults(results$zel11, c(Zel11Observed %>% pull(correctedMean))) %>% dplyr::mutate(profile = "zel11", isHolocene = T),
-    RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% dplyr::mutate(profile = "T1.1", isHolocene = F),
-    RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% dplyr::mutate(profile = "T2.1", isHolocene = F)
-)
-future::plan(strategy = sequential)
 
-test = CV %>% filter(isHolocene, profile=="T1.9") %>% groupByParam %>% calculatePareto()
-test %>% filter(pareto) %>% dplyr::select(sulfate, dustFlux) %>% gather() %>% ggplot(aes(y = value, x = key)) + geom_boxplot() + scale_y_continuous(breaks = scales::extended_breaks(20))
 
+test = ResultsTable %>% filter(isHolocene) %>% groupByParam %>% calculatePareto() # %>% filter(!pareto) %>% calculatePareto %>% filter(!pareto) %>% calculatePareto
+ test %>% filter(pareto) %>% dplyr::select(sulfate, dustFlux) %>% gather() %>% ggplot(aes(y = value, x = key)) + geom_boxplot() + geom_point()+scale_y_continuous(breaks = scales::extended_breaks(20)) + theme(axis.title.x = element_blank())
+test %>% filter(pareto) %>% dplyr::select(sulfate,dustFlux) %>% ungroup%>% summarise_all(median)
 
 #Test real rain----
 IMSRain$year = IMSRain$waterYear %% IMSRain$waterYear[1] + 1
@@ -163,60 +162,89 @@ ggplot(fctbl) + geom_line(aes(x = Kc, y = rmsd, color = group)) + scale_x_contin
 
 
 #sensitivity with gyp----
-AETF = seq(0.8, 1.2, by = 0.1) * 1.2;
-WP = seq(0.8, 1.2, by = 0.1) * 0.013;
-FC = seq(0.8, 1.2, by = 0.1) * 0.1;
-rainSeq = seq(0.8, 1.2, by = 0.1) * 15;
-dustSeq = seq(0.8, 1.2, by = 0.1) * 5;
-sens = as.matrix(bind_rows(crossing(AETF = AETF, WP = 0.013, FC = 0.1, rep = 1:15), crossing(AETF = 1.2, WP, FC = 0.1, rep = 1:15), crossing(AETF = 1.2, WP = 0.013, FC, rep = 1:15)))
+opt.AETF = 1.2;
+opt.WP = 0.013;
+opt.FC = 0.1;
+opt.sulfate = 13;
+opt.dust = 6;
+seq.AETF = seq(0.8, 1.2, by = 0.1) * opt.AETF;
+seq.WP = seq(0.8, 1.2, by = 0.1) * opt.WP;
+seq.FC = seq(0.8, 1.2, by = 0.1) * opt.FC;
+seq.rainSeq = seq(0.8, 1.2, by = 0.1) * opt.sulfate;
+seq.dustSeq = seq(0.8, 1.2, by = 0.1) * opt.dust;
+sens = as.matrix(bind_rows(crossing(AETF = seq.AETF, WP = opt.WP, FC = 0.1), crossing(AETF = 1.2, WP, FC = 0.1, rep = 1:15), crossing(AETF = 1.2, WP = 0.013, FC, rep = 1:15)))
 
-resultsT1.10.par = lapply(1:nrow(sens), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), AETFactor = sens[X, 1], wieltingPoint = sens[X, 2], FieldCapacity = sens[X, 3]))
-resultsT1.9.par = lapply(1:nrow(sens), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), AETFactor = sens[X, 1], wieltingPoint = sens[X, 2], FieldCapacity = sens[X, 3]));
-resultsZel11.par = lapply(1:nrow(sens), function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), AETFactor = sens[X, 1], wieltingPoint = sens[X, 2], FieldCapacity = sens[X, 3]));
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
 
-save(AETFTable,file = "sensData.Rdata")
-AETFTable %>% ggplot(aes(y = diffs / comps, x = WP)) + geom_boxplot(aes(group = WP)) + geom_point()
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.FC), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), FieldCapacity = seq.FC[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.FC), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), FieldCapacity = seq.FC[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.FC), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), FieldCapacity = seq.FC[X], random = F)))
 
-SensitivityTable = tibble(AETFTable %>% group_by(WP) %>% summarise(score = median(diffs / comps)) %>% mutate(WP_l = lag(WP), score_l = lag(score), sensWP = (score - score_l) / (WP - WP_l) * 0.013 / 4.6) %>% slice(3,4)%>% summarise(sensWP = mean(sensWP, na.rm = T)),
-AETFTable %>% group_by(FC) %>% summarise(score = median(diffs / comps)) %>% mutate(FC_l = lag(FC), score_l = lag(score), sensFC = (score - score_l) / (FC - FC_l) * 0.1 / 4.87) %>% slice(3, 4) %>% summarise(sensFC = mean(sensWP, na.rm = T)),
-AETFTable %>% group_by(AETF) %>% summarise(score = median(diffs / comps)) %>% mutate(AETF_l = lag(AETF), score_l = lag(score), senseAETF = (score - score_l) / (AETF - AETF_l) * 1.2 / 4.81) %>% slice(3, 4) %>% summarise(senseAETF = mean(senseAETF, na.rm = T)),
-CV %>% filter(rain %in% rainSeq) %>% group_by(rain) %>% summarise(score = median(diffs / comps)) %>% mutate(rain_l = lag(rain), score_l = lag(score), sensRain = abs((score - score_l) / (rain - rain_l) * 15 / 3.46)) %>% slice(3, 4) %>% summarise(sensRain = mean(sensRain, na.rm = T)),
-CV %>% filter(dust %in% dustSeq) %>% group_by(dust) %>% summarise(score = median(diffs / comps)) %>% mutate(dust_l = lag(dust), score_l = lag(score), sensDust = abs((score - score_l) / (dust - dust_l) * 5 / 6.29)) %>% slice(3, 4) %>% summarise(sensDust = mean(sensDust, na.rm = T))) %>% gather(key = "param", value = "Rel_sens") %>%
-    ggplot(aes(param, Rel_sens)) + geom_point(size = 5) +scale_fill_grey()
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.AETF), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), AETFactor = seq.AETF[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.AETF), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), AETFactor = seq.AETF[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.AETF), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), AETFactor = seq.AETF[X], random = F)))
 
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.WP), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), wieltingPoint = seq.WP[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.WP), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), wieltingPoint = seq.WP[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.WP), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), wieltingPoint = seq.WP[X], random = F)))
+
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.rainSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), rainSO4 = seq.rainSeq[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.rainSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), rainSO4 = seq.rainSeq[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.rainSeq), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), rainSO4 = seq.rainSeq[X], random = F)))
+
+results$T1.10 = c(results$T1.10, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
+results$T1.9 = c(results$T1.9, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainE %>% filter(year > 1000), duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
+results$zel11 = c(results$zel11, lapply(1:length(seq.dustSeq), function(X) CalcGypsum(SynthRainS %>% filter(year > 1000), duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = seq.dustSeq[X], random = F)))
 #create a table where all other parameter are fixed
-sens = bind_rows(
-WPSens = CV %>% filter(FC == 0.1, AETF == 1.2, sulfate == 15, dustFlux == 5,WP%in%WP) %>% group_by(WP) %>% summarise_if(is.numeric, mean) %>% mutate(param = "\u03B8r", change = WP/0.013) ,
-FCSens = CV %>% filter(WP == 0.013, AETF == 1.2, sulfate == 15, dustFlux == 5, FC %in% FC) %>% group_by(FC) %>% summarise_if(is.numeric, mean) %>% mutate(param = "FC", change = FC / 0.1),
-AETFSens = CV %>% filter(FC == 0.1, WP == 0.013, sulfate == 15, dustFlux == 5, AETF %in% AETF) %>% group_by(AETF) %>% summarise_if(is.numeric, mean) %>% mutate(param = "AET.F", change = AETF / 1.2),
-sulfateSens = CV %>% filter(FC == 0.1, AETF == 1.2, WP == 0.013, dustFlux == 5, sulfate %in% rainSeq) %>% group_by(sulfate) %>% summarise_if(is.numeric, mean) %>% mutate(param = "sulfate", change = sulfate / 15),
-dustFSens = CV %>% filter(FC == 0.1, AETF == 1.2, sulfate == 15, WP == 0.013, dustFlux %in% dustSeq) %>% group_by(dustFlux) %>% summarise_if(is.numeric, mean) %>% mutate(param = "dustFlux", change = dustFlux / 5)) %>%
-mutate(optimal = if_else(sulfate == 15 & dustFlux == 5 & WP==0.013 & FC == 0.1 & AETF == 1.2,T,F))
-
-sens %>% filter() %>% dplyr::select(optimal, change, Peak_Concentration = PeakConc, gypsum_depth = PeakDepth, total_concentration = total, param) %>% gather("target", "value", - param, - optimal, - change) %>%
-    ggplot(aes(y = value, x = param)) + geom_boxplot(outlier.shape = NA) + geom_point(aes(color = factor(change * 100)), size =5, show.legend = T) + facet_wrap(target ~ .) +
-    scale_y_continuous(name = "Depth[cm]", sec.axis = sec_axis(~. + 0, name = "Concentration [meq/100g soil]")) + theme(axis.title.x = element_blank(), legend.position = c(0.5, 0.8)) + labs(color = "change from optimal [%]", x = "") + scale_color_brewer(type = "div",palette = 9,direction = -1)
-
-test = tibble(SMeanWD = results %>% map(~pluck(., c("SMeanWD"))) %>% unlist(),
-                Index3 = results %>% map(~pluck(., c("Index03"))) %>% unlist(),
-                SWDp80 = results %>% map(~pluck(., c("SWDp80"))) %>% unlist()) %>% rowid_to_column() %>% gather(Index, depth, - rowid)
-ggplot(test) + geom_bar(aes(x  = rowid * 70, y = depth, color = Index)) + scale_y_reverse(expand = c(0, 0.0), limits = c(50, 0)) +
-                        scale_x_continuous(expand = c(0, 0.0), name = "years")
+#sens = ResultsTable %>% filter(isHolocene)
+senstest = bind_rows(
+WPSens = sens %>% filter(FC == opt.FC, AETF ==opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP),
+FCSens = sens %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, FC %in% seq.FC)  %>% mutate(param = "FC", change = FC / opt.FC),
+AETFSens = sens %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF)  %>% mutate(param = "AET.F", change = AETF / opt.AETF),
+sulfateSens = sens %>% filter(FC == opt.FC, AETF == opt.AETF, WP == opt.WP, dustFlux == opt.dust, sulfate %in% seq.rainSeq)   %>% mutate(param = "sulfate", change = sulfate / opt.sulfate),
+dustFSens = sens %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq)  %>% mutate(param = "dustFlux", change = dustFlux / opt.dust)
+)
 
 
 
+WP1 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Max_Concentration = PeakConc, Parameter = param) %>% gather("target", "value", - Parameter, - change) %>%
+    ggplot(aes(y = value, x = factor(change), fill = Parameter)) + geom_bar(stat = "summary", fun = "mean", position = "dodge2") + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
+    scale_y_continuous(name = "Concentration [meq/100g soil]") + theme(axis.text.x = element_blank(), axis.title.x = element_blank(), legend.text = element_text(size = 30), legend.title = element_text(size = 35), legend.position = c(), axis.title.y = element_text( hjust = 0.9)) + labs( color = "Parameter", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
+# +geom_boxplot(outlier.shape = NA)
+WP2 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Total_concentration = total, param) %>% gather("target", "value", - param, - change) %>%
+    ggplot(aes(y = value, x = factor(change), fill = param)) + geom_bar(stat = "summary", fun = "mean", position = "dodge2") + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
+    scale_y_continuous(name = "") + theme(axis.text.x = element_blank(), axis.title.x = element_blank(), legend.text = element_text(size = 30), legend.title = element_text(size = 35), legend.position = c("none")) + labs(color = "", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
+# +geom_boxplot(outlier.shape = NA)
+WP3 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Gypsum_depth = PeakDepth, param) %>% gather("target", "value", - param, - change) %>%
+    ggplot(aes(y = value, x = factor(change), fill = param)) + geom_bar(stat = "summary", fun = "mean", position = "dodge2") + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
+    scale_y_reverse(name = "Depth[cm]", position = "right") + theme(axis.text.x = element_text(size = 35), legend.text = element_text(size = 30), legend.title = element_text(size = 35), legend.position = c("none")) + labs(color = " change from \n optimal[%]", x = "Change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
+
+    ggarrange(WP1,WP2,WP3)
 
 
-FCarray = seq(0.02, 0.3, by = 0.01);
-RainArr = seq(10, 30, by = 2);
-DustArr = c(seq(0,100, by = 10));
-repetition = 1:5
+rainDaysSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux == opt.dust, isHolocene, !is.na(rainDays))  %>%
+     dplyr::select(rainDays, Gypsum_depth = PeakDepth, Total_concentration = total, Max_Concentration = PeakConc) %>% gather("target", "value", -rainDays) %>%
+     ggplot(rainDaysSens, aes(x = rainDays, y = value)) +geom_point()+ facet_wrap(target ~ .)
+
+
+
+RainArr = seq(12, 15, by = 1);
+DustArr = c(seq(4,6, by = 0.5));
+repetition = 1:10
 rainDustArray = as.matrix(crossing(RainArr, DustArr, repetition))
 nrow(rainDustArray)
 #par computation----
 source("evapostats/parallel.R");
 RateTest = list()
-RateTest = c(RateTest, lapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 100, plotRes = 0, Depth = 100, DustGyp=0.005,dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1])))
+
+resultsT1.10.par = lapply(1:nrow(rainDustArray), function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]))
+resultsT1.9.par = lapply(1:nrow(rainDustArray), function(X) CalcGypsum(SynthRainE, duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+resultsZel11.par = lapply(1:nrow(rainDustArray), function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1), dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1]));
+
+
+ lapply(1:nrow(rainDustArray), FUN = function(X) CalcGypsum(SynthRainE, duration = 100, plotRes = 0, Depth = 100, DustGyp=0.005,dustFlux = rainDustArray[X, 2], rainSO4 = rainDustArray[X, 1])))
 save(RateTest, file =  "rateResults.Rdata")
 bla = plotRate(RateTest)  + coord_cartesian(ylim = c())
 

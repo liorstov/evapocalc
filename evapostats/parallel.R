@@ -1,6 +1,6 @@
 require(parallel)
 load("synth.RData")
-cl <- makeCluster(6, type = "PSOCK")
+cl <- makeCluster(1, type = "PSOCK")
 
 clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1Observed","T1.1Observed"))
 
@@ -20,11 +20,11 @@ clusterExport(cl, "SynthRainE")
 clusterExport(cl, "SynthRainS")
 tic()
 
-days = 9:20;
+days = 6:20;
 annual =  seq(20, 80, by = 10);
 array = tibble(crossing(days, annual),mean = annual/days) %>% filter(mean>=3 & mean <= 11)
 
-for (i in 1:1) {
+for (i in 1:nrow(array)) {
     print(array[i,])
 
     IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
@@ -42,12 +42,12 @@ for (i in 1:1) {
     
     clusterEvalQ(cl, ls())
   
-    results$T2.1 = c(results$T2.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62100, plotRes = 0, Depth = tail(T2.1Observed$bottom, 1))))
-    results$T1.1 = c(results$T1.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62400, plotRes = 0, Depth = tail(T1.1Observed$bottom, 1))))
-    results$T1.9 = c(results$T1.9, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRain, duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1))))
-    results$T1.10 = c(results$T1.10, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRain, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1))))
+   # results$T2.1 = c(results$T2.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62100, plotRes = 0, Depth = tail(T2.1Observed$bottom, 1))))
+    #results$T1.1 = c(results$T1.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62400, plotRes = 0, Depth = tail(T1.1Observed$bottom, 1))))
+    results$T1.9 = c(results$T1.9, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE, duration = 11000, plotRes = 0, Depth = tail(T1.9Observed$bottom, 1))))
+    results$T1.10 = c(results$T1.10, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE, duration = 13400, plotRes = 0, Depth = tail(T1.10Observed$bottom, 1))))
 
-   # results$zel11 = c(results$zel11,parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1))))
+   results$zel11 = c(results$zel11,parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainS, duration = 10300, plotRes = 0, Depth = tail(Zel11Observed$bottom, 1))))
    
 }
 toc()
@@ -56,18 +56,15 @@ save(results, file = "resultsList.RData")
 stopCluster(cl)
 
 future::plan(multiprocess)
-CV = bind_rows(
-    RMSD.T.10 = RectanglingResults(results$T1.10, c(T1.10Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.10",isHolocene = T),
-    RMSD.T1.9 = RectanglingResults(results$T1.9, c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9" ,isHolocene = T),
-    RMSD.Zel11 = RectanglingResults(results$zel11, c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
-    RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
-    RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F)
+resultsTable = bind_rows(
+    RMSD.T.10 = RectanglingResults(results$T1.10 , c(T1.10Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.10", isHolocene = T),
+    RMSD.T1.9 = RectanglingResults(results$T1.9 , c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9", isHolocene = T),
+    RMSD.Zel11 = RectanglingResults(results$zel11 , c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
+    #RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
+    #RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F)
 )
 future::plan(strategy = sequential)
 
 #---
-#join all profiles
-CV = RMSD.T.10 %>% left_join(RMSD.T1.9, by = c("rain", "dust")) %>% left_join(RMSD.Zel11, by = c("rain", "dust")) %>%
-    gather("profile", "value", - rain, - dust) %>% unnest()# %>% rowwise() %>% mutate(minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% ungroup() %>% mutate(site = if_else(str_detect(profile, "zel"), "Zel", "SH"))
 
 plotSoilResultsAgg(results$T1.1[[51]], c(T1.1Observed %>% pull(mean)))

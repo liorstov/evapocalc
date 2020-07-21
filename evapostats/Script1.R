@@ -144,4 +144,4 @@ for (item in 1:length(results[[1]])) {
     results[[1]][[item]]$rainDays = as.numeric(results[[1]][[item]]$FC)
 }
 
-results = results%>% modify_depth(2,~list_modify(.x, rainDays = NA, AnnualRain = NA))
+results = results%>% modify_depth(2,~list_modify(.x, WD = NULL))

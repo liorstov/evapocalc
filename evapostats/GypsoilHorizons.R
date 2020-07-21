@@ -75,33 +75,30 @@ site.list = aggregate(dataframe[,] , by=list(dataframe$siteid), head,1)
 
 AQPClass = as.data.frame(dataframe);
 depths(AQPClass) <- SiteName ~ depthroof + depthbase 
-site(AQPClass) <- ~ subregion
+#site(AQPClass) <- ~ subregion
 
 #slub.structure = horizon thickness cm
 
 #caso4.slab <- slab(AQPClass, fm = groupNum ~ caso4, slab.structure = 1, strict = FALSE)
-caso4.slab.siteid = as_tibble(slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd))
-#caso4.slab.siteid = slab(AQPClass, fm = subregion ~ caso4, slab.structure = 1, strict = FALSE, slab.fun = mean.and.sd)
-
-
-caso4.slab.siteid = caso4.slab.siteid  %>% left_join(dataframe %>% group_by(SiteName) %>% dplyr::select(SiteName,AvgAge,gravel) %>%  summarise_if(is.numeric,mean), by = "SiteName")
+caso4.slab.siteid = as_tibble(slab(AQPClass, fm = SiteName ~ caso4, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd)) %>% drop_na()
+gravel.slab.siteid = as_tibble(slab(AQPClass, fm = SiteName ~ gravel, slab.structure = 5, strict = FALSE, slab.fun = mean.and.sd)) %>% dplyr::select(SiteName, top, bottom, gravel = mean)
+caso4.slab.siteid = caso4.slab.siteid %>% left_join(gravel.slab.siteid, by = c("SiteName","top","bottom"))
+caso4.slab.siteid = caso4.slab.siteid  %>% left_join(dataframe %>% group_by(SiteName) %>% dplyr::select(SiteName,AvgAge) %>%  summarise_if(is.numeric,mean), by = "SiteName")
 #this is for the strips
 write_csv(caso4.slab.siteid, path = "DB\\MeasuredDataProfiles.csv")
 #data for plotting 
-dataplot = caso4.slab.siteid[grep("ZEL", caso4.slab.siteid$SiteName),]
-dataplot = dataplot[grep("early", dataplot$ageclass),]
 dataplot = (caso4.slab.siteid)
 #create plot
 
-my.plot1 = xyplot(top ~ mean | paste(SiteName, "\n", ageclass), data = dataplot, upper = caso4.slab.siteid$upper, ylab = list('Depth [cm]', cex = 3), xlab = list('CaSO4 concentration [meq/100g soil]', cex = 3),
+my.plot1 = xyplot(top ~ mean | paste(SiteName, "\nOSL age: ", AvgAge," Ka"), data = dataplot, upper = caso4.slab.siteid$upper, ylab = list('Depth [cm]', cex = 4), xlab = list('CaSO4 concentration [meq/100g soil]', cex = 4),
                         ylim = c(105, -5), layout = c(),
                         panel = panel.depth_function, cex = 9,
                   prepanel = prepanel.depth_function,
-            par.strip.text = list(cex = 2.2, lines = 3),
-            scales = list(x = list(tick.number = 2, cex = 2), y = list(cex = 2)),
+            par.strip.text = list(cex = 3, lines = 3),
+            scales = list(x = list(tick.number = 2, cex = 3), y = list(cex = 3)),
             par.settings = list(superpose.line = list(col = 'RoyalBlue', lwd =5)),
                    auto.key = list(lines = TRUE, points = FALSE), strip = strip.custom(),
-                   index.cond = list(c(1,3,7,4,6,2,5,8)))
+                   index.cond = list(c(1,8,7,4,2,6,5,3)))
 
 my.plot2 = xyplot(top ~ mean | paste("MAP: ", MeanAnnualPrecipitation), data = caso4.slab.siteid, lower = caso4.slab.siteid$lower, upper = caso4.slab.siteid$upper, main = list(label = plot.title, cex = 0.75), ylab = 'Depth [cm]', xlab = 'CaSO4 concentration [meq/100g soil]',
                         ylim = c(105, -5), xlim = c(-10, 70), layout = c(4, 1),
