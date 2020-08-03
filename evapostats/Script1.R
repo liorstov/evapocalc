@@ -144,4 +144,25 @@ for (item in 1:length(results[[1]])) {
     results[[1]][[item]]$rainDays = as.numeric(results[[1]][[item]]$FC)
 }
 
-results = results%>% modify_depth(2,~list_modify(.x, WD = NULL))
+results = results %>% modify_depth(2, ~ list_modify(.x, WD = NULL))
+
+
+
+
+IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
+
+t = tibble(factor= numeric(),days = numeric())
+for (item in seq(0.1,1,0.05)) {
+    rainSeriesResults = GenerateSeries(NumOfSeries = 900, IMSRain = IMSRain, AnuualRain = item)
+
+    SynthRain = rainSeriesResults$SynthRain;
+
+    t = t %>% add_row(factor = item, days = SynthRain %>% filter(rain > 0) %>% group_by(year) %>% summarise(sum(rain), n = n()) %>% pull(n) %>% mean)
+    
+}
+t
+SynthRain = GenerateSeries(NumOfSeries = 140, IMSRain = IMSRain, AnuualRain = 1.9, WetDays =0.5) %>% pluck("SynthRain")
+SynthRain %>% filter(rain > 0 & rain < 8) %>% group_by(year) %>% summarise(s = sum(rain), n = n()) %>% ungroup %>% summarise_all("mean")
+IMSRain %>% filter(rain > 0.1) %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n()) %>% ungroup %>% summarise_all("mean")
+
+IMSRain %>% filter(rain > 0.1) %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n())

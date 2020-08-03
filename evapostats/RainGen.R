@@ -117,7 +117,7 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays =
     stationName <<- station$stationName;
     shape = station$shape;
     scale = station$scale;
-
+    factor = 1;
     numOfyears <<- measuredYears * NumOfSeries
     #create the synthetic rain series and pick random values for occurance and possible amount from weibull
     #rain generator ---
@@ -126,12 +126,14 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays =
     if (AnuualRain != 0 & WetDays != 0) {
         if (stationName == "Eilat") {
             AltWB = AlternativeWeibullE(AnuualRain / WetDays);
+            factor = 4.743 * WetDays ^ -0.711
         } else {
             AltWB = AlternativeWeibullS(AnuualRain / WetDays);
+            factor = 5.057 * WetDays ^ -0.596
+
         }
         shape = AltWB$shape;
         scale = AltWB$scale;
-        factor = 4.743 * WetDays^-0.711
     }
 
 
@@ -384,13 +386,13 @@ waterYearDayToMonth = function(day) {
 
 AlternativeWeibullE = function(mean) {
     fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.4257)) - mean };
-    scale = fzero(fun, c(1, 11))[[1]];
+    scale = fzero(fun, c(1, 30))[[1]];
     shape = 0.2 * log(scale) + 0.4257;
     return(list(scale = scale, shape = shape))
 }
 AlternativeWeibullS = function(mean) {
     fun = function(x) { x * gamma(1 + 1 / (0.2 * log(x) + 0.5042)) - mean };
-    scale = fzero(fun, c(1, 10))[[1]];
+    scale = fzero(fun, c(0.75, 30))[[1]];
     shape = 0.2 * log(scale) + 0.5042;
     return(list(scale = scale, shape = shape))
 }
