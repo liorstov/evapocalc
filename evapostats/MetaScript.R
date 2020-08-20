@@ -1,7 +1,7 @@
 
 #load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
 load("C:/Users/liorst/Source/Repos/evapocalc/synth.RData")
-load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList.RData")
+load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList3.RData")
 
 require(tidyverse)
 require(Rcpp)
@@ -26,6 +26,13 @@ opt.WP <<- 0.013;
 opt.FC <<- 0.1;
 opt.sulfate <<- 13;
 opt.dust <<- 6;
+opt.WHC <<- 0.087
+seq.WHC = seq(0.8, 1.2, by = 0.2) * opt.WHC %>% rep(60);
+seq.AETF = seq(0.8, 1.2, by = 0.2) * opt.AETF %>% rep(60);
+seq.WP = seq(0.8, 1.2, by = 0.2) * opt.WP %>% rep(60);
+seq.FC = seq(0.8, 1.2, by = 0.2) * opt.FC %>% rep(60);
+seq.rainSeq = seq(0.8, 1.2, by = 0.2) * opt.sulfate %>% rep(60);
+seq.dustSeq = seq(0.8, 1.2, by = 0.2) * opt.dust %>% rep(60);
 
 theme_set(theme_classic() + theme(legend.key.size = unit(1, "line"), legend.text = element_text(size = 25),
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
@@ -36,7 +43,7 @@ axis.title.x = element_text(size = 35),
 legend.key.height = unit(3, "line"),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
-panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 10)));
+panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 20)));
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
 #set wd 
@@ -79,8 +86,8 @@ SynthRainS%>% filter(rain > 0) %>% group_by(year) %>% summarise(s = sum(rain),n 
 res %>% ggplot(aes(factor, wetD)) + geom_line() +geom_point()
 
 #tests---
-result = CalcGypsum(SynthRainE, SynthRain, duration = T2.1Observed$AvgAge[1], plotRes = 0, Depth = tail(T2.1Observed$bottom, 1), DustGyp = 0.01, rainSO4 = 25, dustFlux = 25, FieldCapacity = 0.17)
-plotSoilResults(results$T2.1[[1479]], T2.1Observed)
+result = CalcGypsum(SynthRainE, duration = T1.10Observed$AvgAge[1], plotRes = 0, Depth = 100, rainSO4 = 11, dustFlux = 5, FieldCapacity = 0.1, AETFactor = 1.2, wieltingPoint = 0.016)
+plotSoilResults(results$zel11[[381]], T1.10Observed)
 bla = result$WD %>% group_by(milen = year %/% 1000) %>% summarise(max = max(meanWD), std = sd(meanWD), mean = mean(meanWD))
 
 ggplot(bla, aes(milen * 1000, mean)) + geom_line(size = 4, color = "blue") +
@@ -100,7 +107,7 @@ taliRain = as_tibble(taliRain) %>% left_join(SynthRain  %>% filter(year<=500)%>%
 #aggregateReuslts---
 
 
-test = ResultsTable %>% filter(isHolocene) %>% groupByParam %>% calculatePareto() # %>% filter(!pareto) %>% calculatePareto %>% filter(!pareto) %>% calculatePareto
+test = resultsTable %>% filter(isHolocene) %>% groupByParam %>% calculatePareto() # %>% filter(!pareto) %>% calculatePareto %>% filter(!pareto) %>% calculatePareto
  test %>% filter(pareto) %>% dplyr::select(sulfate, dustFlux) %>% gather() %>% ggplot(aes(y = value, x = key)) + geom_boxplot() + geom_point()+scale_y_continuous(breaks = scales::extended_breaks(20)) + theme(axis.title.x = element_blank())
 test %>% filter(pareto) %>% dplyr::select(sulfate,dustFlux) %>% ungroup%>% summarise_all(median)
 
@@ -220,17 +227,13 @@ rainDaysTable = resultsTable %>% filter(profile == "T1.9", FC == opt.FC, AETF ==
 
 
 
-sensTest = resultsTable %>% drop_na() %>% filter(dustFlux == opt.dust, FC == opt.FC, AETF == opt.AETF, WP == opt.WP, sulfate == opt.sulfate, AnnualRain < 90) %>% mutate(ObsRain = ifelse(region == "shehoret", 27.5, 41), ObsDepth = ifelse(region == "shehoret", 27.5, 22.5), ObsConc = ifelse(region == "shehoret", 2.5, 10), ObsTotal = ifelse(region == "shehoret", 2.5, 10), meanDay = (AnnualRain / rainDays), AnnualRain = (AnnualRain), rainDays = (rainDays), Gypsum_depth = PeakDepth, Max_Concentration = PeakConc, Total_concentration = total) %>%
-    group_by(AnnualRain, rainDays, region) %>% summarise_if(is.numeric, median) %>% gather("target", "value", Gypsum_depth , Max_Concentration, Total_concentration )
-sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = rainDays, size = factor(SWDp80))) + geom_point(shape = 1) + facet_grid(region ~ target) + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "depth [cm]", color = "#  annual\nrain days", size = "mean event\ndepth[mm]") + scale_y_reverse() + geom_point(aes(x = ObsRain, y = ObsDepth),color = "black", size = 10)
+## sens test for weather series---
+sensTest = resultsTable %>% filter(dustFlux == 11, FC == opt.FC, AETF == opt.AETF, WP == opt.WP, sulfate == 12) %>% group_by(AnnualRain = round(AnnualRain), rainDays = round(rainDays), region) %>% summarise_if(is.numeric,median,) %>% mutate(ObsRain = ifelse(region == "shehoret", 27.5, 41), ObsDepth = ifelse(region == "shehoret", 27.5, 22.5), ObsConc = ifelse(region == "shehoret", 2.5, 10), ObsTotal = ifelse(region == "shehoret", 2.5, 10), meanDay = (AnnualRain / rainDays), Gypsum_depth = PeakDepth, Max_Concentration = PeakConc, Total_concentration = total) %>%
+    gather("target", "value", Gypsum_depth , Max_Concentration, Total_concentration )
+sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = q99, size = rainDays)) + geom_point(shape = 1) + facet_grid(region ~ target) + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "depth [cm]", color = "q99 [mm]", size = "#  annual\nrain days") + scale_y_reverse() + geom_point(aes(x = ObsRain, y = ObsDepth), color = "black", size = 10)
 
-sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = (rainDays), size = meanDay)) + geom_point(shape = 1) + facet_wrap(region ~ target, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "gypsum[meq/100g soil]", color = "#  annual\nrain days", size = "mean event\ndepth[mm]") 
-
-sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = q99, y = value, color = rainDays, size = meanDay)) + geom_point(shape = 1) + facet_wrap(region ~ target, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "q99", color = "#  annual\nrain days", size = "mean event\ndepth[mm]") + scale_y_reverse()
-
-sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = q99, y = (value), color = rainDays, size = meanDay)) + geom_point(shape = 1) + facet_wrap(region ~ target, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "q99", color = "rain days")
-    
-sensTest %>% ggplot(aes(x = AnnualRain, y = SWDp80, size = (rainDays))) + geom_point(shape = 1) + facet_grid(region ~ target) + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "depth [cm]", color = "# rain days", size = "event depth[mm]") + scale_y_reverse()
+sensTest %>% filter(target != "Gypsum_depth")  %>% ggplot(aes(x = AnnualRain, y = value, color = (rainDays))) + geom_point() + facet_wrap(region ~ target, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "Annual rain [mm]", y = "gypsum[meq/100g soil]", color = "q99 [mm]", size = "#  annual\nrain days")
+#---
 
 
 RainArr = seq(20, 25, by = 1);

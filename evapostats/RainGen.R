@@ -79,6 +79,19 @@ MovingAvarage = function(x, win1, win2 = NULL) {
     return (ret)
 }
 
+MovingAvarageSD = function(x, win1, win2 = NULL) {
+    ret = rollapply(x, win1, sd, na.rm = TRUE, fill = NA, partial = TRUE)
+    if (!is.null(win2)) {
+        ret = rollapply(ret, win2, sd, na.rm = TRUE, fill = NA, partial = TRUE)
+    }
+
+    #ret = na_ma(x, k = win1, weighting = "simple");
+    #if (!is.null(win2)) {
+    #ret = na_ma(x, k = win2, weighting = "simple");
+    #}
+    return(ret)
+}
+
 GetImsRain = function(station = 347700 ,stationEvap = 347704) {
     #stationElat = 347700;
     #stationElatEvap = 347704;

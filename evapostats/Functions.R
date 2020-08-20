@@ -30,7 +30,8 @@ MSD = function(observed, measured) {
 
 
 sqrDiff <- function(observed, measured) {
-    sum((observed - measured) ^ 2)
+    limit = min(length(observed),length(measured))
+    sum(((observed %>% head(limit)) - (measured %>% head(limit))) ^ 2)
 }
 LOOCV = function(CV) {
     resCV = tibble(profile = character(), val = numeric(), dust = numeric(), rain = numeric())
@@ -44,12 +45,13 @@ LOOCV = function(CV) {
     return(resCV)
 }
 
-CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, duration, Depth = 100, thick = 5, wieltingPoint = opt.WP,
+CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, duration, Depth = 150, thick = 5, wieltingPoint = opt.WP,
                          nArea = 1, FieldCapacity = opt.FC, DustGyp = 0.005, AETFactor = opt.AETF, plotRes = FALSE,
-                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T) {
+                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T,distribution = F) {
 
 
 
+    rainCa = rainSO4;
     # if pleistocene series suppied
     if (!is.null(rainPleistocene) & duration > 10000) {
         print("pleistocene profile")
@@ -70,24 +72,23 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
         #apply runoff function
         raindata = raindata %>% mutate(rain = ageRainfunc(year, rain))
 
-        rainStat = rainPleistocene %>% filter(rain > 0) %>% group_by(year) %>% summarise(n = n(), annual = sum(rain), max = max(rain))
+        rainStat = rainPleistocene %>% filter(rain > 0) %>% group_by(year) %>% summarise(n = n(), annual = sum(rain), max = max(rain), mean = mean(rain), sd = sd(rain))
     } else {
         print("holocene profile")
         if (random) {
             #scrumble series
             randomYears = sample(max(rainHolocene$year), duration)
             raindata = rainHolocene %>% filter(year %in% randomYears)
-            raindata = raindata %>% mutate(year = rep(1:duration, each = 365))
+            raindata = raindata %>% mutate(origyear = year, year = rep(1:duration, each = 365))
 
         }
         else {
             raindata = rainHolocene
         }
 
-        rainStat = raindata %>% filter(rain > 0) %>% group_by(year) %>% summarise(n = n(), annual = sum(rain), max = max(rain))
-
+        #daysDuration = getDaysDuration(raindata);
+       rainStat = raindata  %>% group_by(year) %>% summarise(origyear = mean(origyear),n = sum(rain>0.1), annual = sum(rain), max = max(rain), sd = sd(rain),PET = sum(PET), meanPET = mean(PET)) 
     }
-
 
 
 
@@ -97,10 +98,18 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
     tictoc::toc()
     list$thick = thick;
 
-    list$rainDays = mean(rainStat$n);
+   # list$rainStat = rainStat
+    list$max = mean(rainStat$max, na.rm = T)
+    list$sd = mean(rainStat$sd, na.rm = T)
+    list$rainDays = mean(rainStat$n, na.rm = T);
     list$AnnualRain = mean(rainStat$annual);
     list$q99 = rainStat %>% pull(max) %>% quantile(0.99) %>% as.numeric
-
+    list$exc = rainStat %>% tally(max > 50) %>% as.numeric
+    if (distribution) {
+        WeibullScaleShape = raindata %>% filter(rain > 0.1) %>% pull(rain) %>% fitdist("weibull", method = "mle")
+        list$WBShape = WeibullScaleShape$estimate[1]
+        list$WBScale = WeibullScaleShape$estimate[2]
+    }
     #yearly = raindata %>% group_by(year) %>% summarise(yearlyRain = sum(rain), RainDays = length(which(rain > 0)), meanYear = mean(rain), RMSD = sd(rain));
     #list$YearlyRain = yearly %>% pull(yearlyRain);
     #list$RainDays = yearly %>% pull(RainDays);
@@ -136,7 +145,9 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
 
     list$YearDust = NULL;
     list$YearGyp = NULL;
+    list$YearMaxGyp = NULL;
     list$YearSulfate = NULL;
+    list$YearCa = NULL;
     if (getWD) {
         list$WD = raindata
     }
@@ -146,6 +157,11 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
     #  list$WD = DayWD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), sd = sd(max)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(max), var = var(max));
 
     return(list)
+}
+
+getDaysDuration = function(series) {
+    temp = series %>% filter(rain > 0.1) %>% mutate(duration = ifelse(dayIndex - lag(dayIndex) == 1, 1, 0)) %>% group_by(year, grp = with(rle(duration), rep(seq_along(lengths), lengths)))  %>% summarise(duration = sum(duration) + 1) %>% group_by(year) %>% summarise(maxDuration = max(duration), meanDuration = mean(duration))
+    return(temp)
 }
 CalcGypsumDouble <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, duration, Depth = 100, thick = 5, wieltingPoint = opt.WP,
                          nArea = 1, FieldCapacity = opt.FC, DustGyp = 0.005, AETFactor = opt.AETF, plotRes = FALSE,
@@ -168,16 +184,22 @@ CalcGypsumDouble <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, 
 
 GetSensitivityFromResults = function(resultsTable) {
 
+    #get values of the reference computation
     resultsTable$refPeakConc = resultsTable$PeakConc %>% lead(1)
     resultsTable$refPeakDepth = resultsTable$PeakDepth %>% lead(1)
     resultsTable$reftotal = resultsTable$total %>% lead(1)
+
+    #erase ref computation
     resultsTable = resultsTable %>% filter(rowid %% 2 != 0 )
 
+    #relative values from ref
     resultsTable = resultsTable %>% mutate(Max_Concentration = (PeakConc - refPeakConc) / refPeakConc,
                     Gypsum_depth = (PeakDepth - refPeakDepth) / refPeakDepth,
-                       Total_concentration = (total - reftotal) / reftotal);
+                       Total_concentration = (total - reftotal) / reftotal,WHC = FC-WP);
 
+    #build tibble with values for each parameter and calculate the normelise factor
     senstest = bind_rows(
+    WHCSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP, FC %in% seq.FC) %>% mutate(param = "WHC", change = WHC / opt.WHC, normal = opt.WHC / (WHC - opt.WHC)),
     WPSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP, normal = opt.WP / (WP - opt.WP)),
     FCSens = resultsTable %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, FC %in% seq.FC) %>% mutate(param = "FC", change = FC / opt.FC, normal = opt.FC / (FC - opt.FC)),
     AETFSens = resultsTable %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF) %>% mutate(param = "AET.F", change = AETF / opt.AETF, normal = opt.AETF / (AETF - opt.AETF)),
@@ -185,16 +207,19 @@ GetSensitivityFromResults = function(resultsTable) {
     dustFSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq) %>% mutate(param = "dustFlux", change = dustFlux / opt.dust, normal = opt.dust / (dustFlux - opt.dust))
     )
 
+    #calculate with normalisation factor
     senstest = senstest %>% mutate(normal = abs(normal), Max_Concentration = Max_Concentration * normal, Gypsum_depth = Gypsum_depth * normal, Total_concentration = Total_concentration * normal) %>% drop_na()
 
+    senstest$param = factor(senstest$param, levels = c("\u03B8r", "FC","WHC", "AET.F", "dustFlux", "sulfate"))
+    #plot
     senstest %>% filter(change != 1) %>% dplyr::select(change, Max_Concentration, Gypsum_depth, Total_concentration, Parameter = param) %>% gather("target", "value", - Parameter, - change) %>%
-    ggplot(aes(y = value, x = factor(change), fill = Parameter)) + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_boxplot(outlier.shape = NA) + geom_point(stat = "summary", fun = "mean", shape = 5, size = 2, position = position_dodge(0.75)) + geom_hline(aes(yintercept = 0), linetype = "longdash") + facet_wrap(target ~ ., nrow = 1) +
-    scale_y_continuous(name = "Difference from ref.") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "Parameter", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
+    ggplot(aes(y = value, x = factor(change), fill = Parameter)) + facet_wrap(target ~ ., nrow = 1) + geom_boxplot(outlier.shape = NA) + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_point(stat = "summary", fun = "mean", shape = 5, size = 2, position = position_dodge(0.75)) + geom_point(position = position_dodge(0.75)) + geom_hline(aes(yintercept = 0), linetype = "longdash") +
+    scale_y_continuous(name = "Rel sensitivity [-]") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "Parameter", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
 
 }
 
 loadObsProfiles = function() {
-    observedProfiles = read_csv("DB\\MeasuredDataProfiles.csv") %>% drop_na() %>% mutate(gravel = gravel / 100, correctedMean = mean * (1 - gravel))
+    observedProfiles = read_csv("DB\\MeasuredDataProfiles.csv") 
     Zel11Observed <<- observedProfiles %>% filter(str_detect(SiteName, "11"))
     Zel12Observed <<- observedProfiles %>% filter(str_detect(SiteName, "12"))
     Zel13Observed <<- observedProfiles %>% filter(str_detect(SiteName, "13"))
@@ -209,18 +234,19 @@ comp2Depth = function(comp, thick) {
     return((comp - 1 + 0.5) * thick)
 }
 plotSoilResults = function(res, observed = NULL) {
-    resLeach = tibble(gypsum = res$gypsum) %>% rowid_to_column %>%
-                        mutate(depth = (rowid - 0.5) * res$thick, calculated = res$gypsum, measured = observed$correctedMean) %>%
-                        dplyr::select(depth, calculated, measured) %>% gather("factor", "gypsum", - depth)
+    observedT = tibble(measured = observed$correctedMean) %>% rowid_to_column
+    resLeach = tibble(calculated = res$gypsum) %>% rowid_to_column %>%
+                        mutate(depth = (rowid - 0.5) * res$thick) %>% left_join(observedT) %>% mutate(inMeasured = !is.na(measured)) %>%
+                        gather("factor", "gypsum", - depth, - rowid, - inMeasured)
 
-    WP1 = ggplot(resLeach, aes(y = depth, x = gypsum, fill = factor)) + scale_y_reverse(expand = c(0, 0.0)) +
+    WP1 = ggplot(resLeach, aes(y = depth, x = gypsum, fill = factor, alpha = factor(inMeasured))) + scale_y_reverse(expand = c(0, 0.0)) +
                     scale_x_continuous(name = "gypsum mEq/100g soil", expand = c(0, 0.0)) +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1), legend.title = element_blank()) +
-                    guides(fill = guide_legend(reverse = TRUE)) +
-                   geom_bar(stat = "identity", position = "dodge2") + scale_fill_manual(values = c("brown2", "grey45")) +
+                    guides(fill = guide_legend(reverse = TRUE),alpha = F) +
+                   geom_bar(stat = "identity", position = "dodge") + scale_fill_manual(values = c("brown2", "grey45")) + scale_alpha_discrete(range = c(0.5, 1))+
     #geom_line(aes(x = depth, y = Ca, color = "Ca")) +
     #geom_line(aes(x = depth, y = SO4, color = "SO4")) +
-    #ggtitle(paste("duration = ", res$duration, "; daily dust flux = ", round(res$DF*1000,3), "mg/cm3/day; dust Ca = ", res$DCa, "mg/g; dust SO4 = ", res$DSO4, "mg/g; Rain Ca = ", res$RCa, "mg/L; Rain SO4 = ", res$RSO4,"mg/L")) +
+    ggtitle(paste("duration = ", res$duration, "; daily dust flux = ", round(res$DF*1000,3), "mg/cm3/day; dust SO4 = ", res$DSO4, "mg/g; Rain SO4 = ", res$RSO4,"mg/L; annual rain = \n",res$AnnualRain,"  rain days = ", res$rainDays)) +
     #geom_vline(aes(xintercept = res$SMeanWD, color = paste("MeanSWD = ", res$SMeanWD))) +
     #geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
     geom_hline(aes(yintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)), linetype = 2, size = 2) + scale_color_manual(values = "orange")
@@ -266,8 +292,8 @@ RectanglingResults = function(res, obs) {
 
     meanOBS = mean(obs);
     #calculate target function
-    rmsdTable = res %>% furrr::future_map_dfr(.f = ~(tibble(AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, sqrDiff = sqrDiff(.x$gypsum, obs), bias = bias(.x$gypsum, obs, .x$thick), PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick), comps = length(obs),
-        total = sumGypsum(.x$gypsum, .x$thick), SMeanWD = .x$SMeanWD, SWDp80 = .x$SWDp80))) %>% rowid_to_column()
+    rmsdTable = res %>% map_dfr(.f = ~(tibble(AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, sqrDiff = sqrDiff(.x$gypsum, obs), bias = bias(.x$gypsum, obs, .x$thick), PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick), comps = length(obs), sd = .x$sd, max = .x$max,
+        total = sumGypsum(.x$gypsum, .x$thick), SMeanWD = .x$SMeanWD, SWDp80 = .x$SWDp80, q99 = .x$q99, maxWD = .x$maxWD, exc = .x$exc))) %>% rowid_to_column()
     return(rmsdTable)
 
 }
@@ -278,6 +304,7 @@ groupByParam = function(res) {
 
 
 sensitivity = function(res) {
+    res = res %>% mutate(WHC = FC - WP);
     senstest = bind_rows(
         WPSens = res %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP),
         FCSens = res %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, FC %in% seq.FC) %>% mutate(param = "FC", change = FC / opt.FC),
@@ -292,7 +319,7 @@ ResultsTargetFunction = function(res, obs) {
 
     meanOBS = mean(obs);
     #calculate target function
-    rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, AETF = .x$AETF, FC = .x$FC, WP = .x$WP, dust = .x$DF, value = sqrDiff(.x$gypsum, obs), diffs = diffs(.x$gypsum, obs), PickConc = max(.x$gypsum), PickDepth = comp2Depth(which.max(.x$gypsum)), comps = length(.x$gypsum))))
+    rmsdTable = res %>% map_df(.f = ~(tibble(rain = .x$RSO4, AETF = .x$AETF, FC = .x$FC, WP = .x$WP, dust = .x$DF, value = sqrDiff(.x$gypsum, obs), diffs = diffs(.x$gypsum, obs), PickConc = max(.x$gypsum), PickDepth = comp2Depth(which.max(.x$gypsum)), comps = length(.x$gypsum), sd = .x$sd, max = .x$max)))
     #group_by(AETF) %>% summarise(mean = mean(value), min = quantile(value, 0.05), max = quantile(value, 0.95), meanOBS, sd = sd(value), n = n(), comps = sum(comps), diffs = sum(diffs), PickDepth = mean(PickDepth), PickConc = mean(PickConc), minRMSD = joinRMSD(min, comps), meanRMSD = joinRMSD(mean, comps), maxRMSD = joinRMSD(max, comps), normRMSD = joinRMSD(mean, comps) / meanOBS) %>% nest(value = c(mean, min, max, comps, n, meanOBS, sd, diffs, PickDepth, PickConc, minRMSD, meanRMSD, maxRMSD, normRMSD))
     return(rmsdTable)
 
@@ -300,7 +327,8 @@ ResultsTargetFunction = function(res, obs) {
 
 #target function for overall diff
 bias = function(res, obs, thick) {
-    abs(sumGypsum(res, thick) - sumGypsum(obs, thick))
+    limit = min(length(obs), length(res))
+    abs(sumGypsum(res %>% head(limit), thick) - sumGypsum(obs %>% head(limit), thick))
 }
 
 #gypsum concentration in undivided profile
@@ -354,7 +382,7 @@ calculatePareto = function(parameterTable) {
     parameterTable$pareto[test] = T;
     unloadNamespace("ecr")
 
-    print(parameterTable %>% ggplot(aes(RMSD, bias, color = factor(pareto))) + labs(x = "RMSD[meq/100g soil]", y = "abs(bias)[meq/100g soil]", color = "level", size = "dust flux mg/m2/yr") + geom_point(size = 3, show.legend = FALSE) + guides(color = guide_legend(override.aes = list(size = 8))) + coord_cartesian(c(0, 10), c(0, 60)))
+    print(parameterTable %>% ggplot(aes(RMSD, bias, alpha = factor(pareto), color = sulfate)) + labs(x = "RMSD[meq/100g soil]", y = "abs(bias)[meq/100g soil]", size = "dust flux mg/m2/yr") + geom_point(size = 3))
 
     return(parameterTable)
 }
@@ -479,17 +507,28 @@ ageRainfunc = function(age, rain) {
     return(rain - runoff);
 }
 
+
 Theta.fc = function(silt, clay) {
     sand = 100 - silt - clay;
-    rosetta = soilptf::soilinfo.rosetta(print(tibble(sand, clay, silt)))
-    print(rosetta)
-    Sfc = rosetta$n ^ (-0.6 * (2 + log10(rosetta$Ks)))
+    rosetta = soilptf::soilinfo.rosetta((tibble(sand, clay, silt)))
+
+    temp = ((rosetta$n - 1) / rosetta$n) ^ (1 - 2 * rosetta$n)
+    Sfc = (1 + temp) ^ ((1 - rosetta$n) / rosetta$n)
     Theta.fc = rosetta$theta_r + Sfc * (rosetta$theta_s - rosetta$theta_r)
     return(Theta.fc)
 }
 
+Theta.r = function(silt, clay) {
+    sand = 100 - silt - clay;
+    rosetta = soilptf::soilinfo.rosetta((tibble(sand, clay, silt)))
+   
+    return(rosetta$theta_r)
+}
 addElementToResults = function() {
     results = results %>% modify_depth(2, ~ list_modify(.x, rainQuantiles = ifelse(is.na(.x$rainQuantiles[1]), list(rep(NA, 11)), .x$rainQuantiles)))
     results = results %>% modify_depth(2, ~ list_modify(.x, q99 = ifelse(is.na(.x$q99), NA, .x$q99)))
     bla = results$zel1 %>% map_depth(1, pluck("q99")) %>% map_df(tibble) %>% mutate(length("<list>"))
 }
+
+ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(type = "qual", palette = 3)
+

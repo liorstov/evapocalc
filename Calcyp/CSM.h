@@ -54,7 +54,9 @@ public:
 	Rcpp::List results;
 	void InitCompartments();
 	void initVector(Rcpp::DoubleVector & inputVector);
-	
+	inline bool firstDayInYear(int day) {
+		return(!((day + 1) % 365));
+	}
 
 
 	std::vector<Compartment> Compartments;

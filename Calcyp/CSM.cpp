@@ -105,10 +105,12 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	Rcpp::DoubleVector dayRain = DoubleVector::create();
 	Rcpp::DoubleVector WD (nNumOfDays);
 	Rcpp::DoubleVector YearGyp (years);
-	Rcpp::DoubleVector YearDust(years);
+	Rcpp::DoubleVector YearMaxGyp (years);
+	Rcpp::DoubleVector YearCa(years);
 	Rcpp::DoubleVector YearSulfate(years);
 	initVector(YearGyp);
-	initVector(YearDust);
+	initVector(YearMaxGyp);
+	initVector(YearCa);
 	initVector(YearSulfate);
 	
 	Gypsum.erase(0, Gypsum.length());
@@ -154,20 +156,20 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		nTotalRain += nDailyRain;
 		Compartments[0].nMoist += nDailyRain;   // set the moiture of the 1st compartment to the intial moisture plus the daily rainfall. rainfall is added only the 1st compartment
 
-		YearDust[year] += nDailyDustGyp;
 
 		//accumolate dust and relaese when its raining 
 		if (nDailyRain > 0) {
 			Compartments[0].C_Ca +=  DailyCaRain;
 			Compartments[0].C_SO4 += DailySO4Rain;
 			Compartments[0].C_CaSO4 += accumolateDustDays * nDailyDustGyp;
-			YearSulfate[year] += DailySO4Rain;
+			
 			accumolateDustDays = 0;
 		}
 		else
 		{
 			accumolateDustDays++;
 		}
+		
 
 		// This is the second loop that runs through the soil profile
 		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
@@ -223,7 +225,16 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 				
 				GypAgg = Compartments[CurrentComp].solubility(nTemp);
 				
-				YearGyp[year] += mol2meqSoil(GypAgg, thick); 
+			}
+			if (firstDayInYear(day)) {
+				YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick);
+				YearCa[year] += mol2meqSoil(Compartments[CurrentComp].C_Ca, thick);;
+				YearSulfate[year] += mol2meqSoil(Compartments[CurrentComp].C_SO4, thick);
+				// get gypsum horizon of the year
+				if (Compartments[CurrentComp].C_CaSO4 > Compartments[YearMaxGyp[year]].C_CaSO4)
+				{
+					YearMaxGyp[year] = CurrentComp;
+				}
 			}
 				//	myfile << day << "," << CurrentComp << "," << nDailyRain * 0.001 << "," << nDailyAET * 0.001 << "," << Compartments[CurrentComp].nMoist * 0.001 << "," << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) <<",";
 
@@ -295,6 +306,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		if (fmod(double(day)/ double(nNumOfDays), 0.1 )  == 0) {
 			Rcout << double(day) / double(nNumOfDays) * 100 << "%; ";
 		}
+
+
 	}
 
 	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
@@ -341,8 +354,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		_["inputCa"]= inputCa,
 		_["outputCa"]= outputCa,
 		_["YearGyp"] = YearGyp,
+		_["YearMaxGyp"] = YearMaxGyp,
 		_["YearSulfate"] = YearSulfate,
-		_["YearDust"] = YearDust);
+		_["YearCa"] = YearCa);
 
 	return results;
 }
@@ -430,7 +444,7 @@ void CSM::initVector(Rcpp::DoubleVector & inputVector)
 }
 
 
-	
+
 
 	
 
