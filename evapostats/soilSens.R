@@ -59,13 +59,21 @@ results$T1.10 = c(results$T1.10, parLapply(cl, 1:length(seq.rainSeq), function(X
 results$T1.9 = c(results$T1.9, parLapply(cl, 1:length(seq.rainSeq), function(X) CalcGypsumDouble(SynthRainE, duration = 11000, rainSO4 = seq.rainSeq[X])))
 results$zel11 = c(results$zel11, parLapply(cl, 1:length(seq.rainSeq), function(X) CalcGypsumDouble(SynthRainS, duration = 10300, rainSO4 = seq.rainSeq[X])))
 
+results$T1.10 = c(results$T1.10, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainE, duration = 13400, wieltingPoint = opt.WP * 0.8, FieldCapacity = opt.FC * 0.8)))
+results$T1.9 = c(results$T1.9, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainE, duration = 11000, wieltingPoint = opt.WP * 0.8, FieldCapacity = opt.FC * 0.8)))
+results$zel11 = c(results$zel11, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainS, duration = 10300, wieltingPoint = opt.WP * 0.8, FieldCapacity = opt.FC * 0.8)))
+
+results$T1.10 = c(results$T1.10, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainE, duration = 13400, wieltingPoint = opt.WP * 1.2, FieldCapacity = opt.FC * 1.2)))
+results$T1.9 = c(results$T1.9, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainE, duration = 11000, wieltingPoint = opt.WP * 1.2, FieldCapacity = opt.FC * 1.2)))
+results$zel11 = c(results$zel11, parLapply(cl, 1:60, function(X) CalcGypsumDouble(SynthRainS, duration = 10300, wieltingPoint = opt.WP * 1.2, FieldCapacity = opt.FC * 1.2)))
+#----
 
 
 save(results, file = "resultsListSoileSens.RData")
 
+
 stopCluster(cl)
 
-future::plan(multiprocess)
 resultsTable = bind_rows(
    RMSD.T.10 = RectanglingResults(results$T1.10 %>% flatten, c(T1.10Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.10", isHolocene = T),
     RMSD.T1.9 = RectanglingResults(results$T1.9 %>% flatten, c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9", isHolocene = T),
@@ -74,42 +82,37 @@ resultsTable = bind_rows(
 #RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
 #RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1Observed %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
 )
-future::plan(strategy = sequential)
 resultsTable = resultsTable %>% mutate(optimal = ifelse(FC == opt.FC & AETF == opt.AETF & sulfate == opt.sulfate & dustFlux == opt.dust & WP == opt.WP, T, F)) %>%
     mutate(region = ifelse(profile %in% c("zel11", "zel1"), "zeelim", "shehoret"))
-save(resultsTable, results, file = "resultsTableCal.RData")
 
-#---
+#get values of the reference computation
+resultsTable$refPeakConc = resultsTable$PeakConc %>% lead(1)
+resultsTable$refPeakDepth = resultsTable$PeakDepth %>% lead(1)
+resultsTable$reftotal = resultsTable$total %>% lead(1)
+
+#erase ref computation
+resultsTable = resultsTable %>% filter(rowid %% 2 != 0)
+
+#relative values from ref
+resultsTable = resultsTable %>% mutate(Max_Concentration = (PeakConc - refPeakConc) / refPeakConc,
+                    Gypsum_depth = (PeakDepth - refPeakDepth) / refPeakDepth,
+                       Total_concentration = (total - reftotal) / reftotal, WHC = FC - WP);
+
+#build tibble with values for each parameter and calculate the normelise factor
 senstest = bind_rows(
-WPSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP),
-FCSens = resultsTable %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, FC %in% seq.FC) %>% mutate(param = "FC", change = FC / opt.FC),
-AETFSens = resultsTable %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF) %>% mutate(param = "AET.F", change = AETF / opt.AETF),
-sulfateSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, WP == opt.WP, dustFlux == opt.dust, sulfate %in% seq.rainSeq) %>% mutate(param = "sulfate", change = sulfate / opt.sulfate),
-dustFSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq) %>% mutate(param = "dustFlux", change = dustFlux / opt.dust)
-)
-bla = senstest %>% rowid_to_column(var = "id") %>% filter(change == 1) %>% group_by(PeakConc) %>% summarise(mean(FC), n = n(), target = mean(id)) %>% filter(n == 1) %>% pull(target)
-senstest = senstest %>% slice(-bla)
+    WHCSens = resultsTable %>% filter( AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP, FC %in% seq.FC) %>% mutate(param = "WHC", change = WHC / opt.WHC, normal = opt.WHC / (WHC - opt.WHC)),
+   # WPSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP, normal = opt.WP / (WP - opt.WP)),
+  #  FCSens = resultsTable %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, FC %in% seq.FC) %>% mutate(param = "FC", change = FC / opt.FC, normal = opt.FC / (FC - opt.FC)),
+    AETFSens = resultsTable %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF) %>% mutate(param = "AET.F", change = AETF / opt.AETF, normal = opt.AETF / (AETF - opt.AETF)),
+    sulfateSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, WP == opt.WP, dustFlux == opt.dust, sulfate %in% seq.rainSeq) %>% mutate(param = "sulfate", change = sulfate / opt.sulfate, normal = opt.sulfate / (sulfate - opt.sulfate)),
+    dustFSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq) %>% mutate(param = "dustFlux", change = dustFlux / opt.dust, normal = opt.dust / (dustFlux - opt.dust))
+    )
 
-senstest = senstest %>% filter(change == 1) %>% dplyr::select(refMaxconc = PeakConc, refDepth = PeakDepth, refTotal = total) %>% summarise_all(median) %>% cbind(senstest) %>% tibble
-senstest = senstest %>% mutate(refMaxconc = PeakConc / refMaxconc, refDepth = PeakDepth / refDepth, refTotal = total / refTotal)
-save(senstest, file = "senstable.RData")
-WP1 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Max_Concentration = PeakConc, Parameter = param) %>% gather("target", "value", - Parameter, - change) %>%
-    ggplot(aes(y = value, x = factor(change), fill = Parameter)) + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_boxplot() + geom_point(stat = "summary", fun = "mean", shape = 5, size = 4, position = position_dodge(0.75)) + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
-    scale_y_continuous(name = "Concentration [meq/100g soil]") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35), axis.title.y = element_text(hjust = 0.9)) + labs(color = "Parameter", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
-# +geom_boxplot(outlier.shape = NA)
-WP2 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Total_concentration = total, param) %>% gather("target", "value", - param, - change) %>%
-    ggplot(aes(y = value, x = factor(change), fill = param)) + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_boxplot() + geom_point(stat = "summary", fun = "mean", shape = 5, size = 4, position = position_dodge(0.75)) + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
-    scale_y_continuous(name = "") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "", x = "change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
-# +geom_boxplot(outlier.shape = NA)
-WP3 = senstest %>% filter(round(change, 1) %in% c(0.8, 1, 1.2)) %>% dplyr::select(change, Gypsum_depth = PeakDepth, param) %>% gather("target", "value", - param, - change) %>%
-    ggplot(aes(y = value, x = factor(change), fill = param)) + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_boxplot() + geom_point(stat = "summary", fun = "mean", shape = 5, size = 4, position = position_dodge(0.75)) + facet_wrap(target ~ ., scales = "free_y", nrow = 3) +
-    scale_y_reverse(name = "Depth[cm]", position = "right") + theme(strip.text = element_text(size = 30), axis.text.x = element_text(size = 35), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = " change from \n optimal[%]", x = "Change from optimal") + scale_fill_brewer(type = "qual", palette = 7) + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))
+#calculate with normalisation factor
+senstest = senstest %>% mutate(normal = abs(normal), Max_Concentration = Max_Concentration * normal, Gypsum_depth = Gypsum_depth * normal, Total_concentration = Total_concentration * normal) %>% drop_na()
 
-ggarrange(WP1 + theme(axis.text.x = element_blank(), axis.title.x = element_blank(), legend.key.size = unit(5, "line")),
-    WP2 + theme(axis.text.x = element_blank(), axis.title.x = element_blank(), legend.position = c("")),
-        WP3 + theme(legend.position = c("")))
-
-
-
-rainDaysTable = resultsTable %>% filter(profile == "T1.9", FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP == opt.WP, !is.na(rainDays)) %>%
-    group_by(meanDay = round(AnnualRain / rainDays, 1)) %>% summarise(median = median(total), min = quantile(total, 0.2), max = quantile(total, 0.8)) %>% ggplot(aes(x = meanDay, y = median, ymax = max, ymin = min)) + geom_line() + geom_ribbon(alpha = 0.5)
+senstest$param = factor(senstest$param, levels = c("\u03B8r", "FC", "WHC", "AET.F", "dustFlux", "sulfate"))
+#plot
+senstest %>% dplyr::select(change, Max_Concentration, Gypsum_depth, Total_concentration, Parameter = param,rowid,region) %>% gather("target", "value", - Parameter, - change,-rowid,-region) %>%
+    ggplot(aes(y = value, x = factor(change), color = Parameter)) + facet_wrap(target ~ ., nrow = 1) + geom_boxplot(outlier.shape = NA,fill = "gray90") + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_point(aes(color = Parameter),stat = "summary", fun = "mean", shape = 5, size = 2, position = position_dodge(0.75)) + geom_hline(aes(yintercept = 0), linetype = "longdash") +
+    scale_y_continuous(name = "Rel sensitivity [-]") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "Parameter", x = "change from optimal")  + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))

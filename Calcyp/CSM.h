@@ -58,6 +58,13 @@ public:
 		return(!((day + 1) % 365));
 	}
 
+//holocene profile have 0.1 FC and plesitocene profiles have 0.2 FC. a linear function updates the fc every year
+	inline void updateFieldCapacity(int year) {
+		if (year > 10000)
+			nFieldCapacity = (year / 500000 + 0.08)*thick;
+		
+	}
+
 
 	std::vector<Compartment> Compartments;
 	Rcpp::NumericVector RainArr;

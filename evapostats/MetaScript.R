@@ -24,7 +24,7 @@ require(future.apply)
 opt.AETF <<- 1.2;
 opt.WP <<- 0.013;
 opt.FC <<- 0.1;
-opt.sulfate <<- 13;
+opt.sulfate <<- 10;
 opt.dust <<- 6;
 opt.WHC <<- 0.087
 seq.WHC = seq(0.8, 1.2, by = 0.2) * opt.WHC %>% rep(60);
@@ -43,7 +43,7 @@ axis.title.x = element_text(size = 35),
 legend.key.height = unit(3, "line"),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
-panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(colour = guide_legend(override.aes = list(size = 20)));
+panel.border = element_rect(colour = "black", fill = NA, size = 0))) + guides(color = guide_legend(override.aes = list(size = 8)))
 Sys.setlocale("LC_TIME", "English_Israel.1255");
 
 #set wd 
@@ -62,38 +62,18 @@ b <<- new(CSMCLASS);
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
-rainSeriesResults = GenerateSeries(NumOfSeries = 900, IMSRain = IMSRain, AnuualRain = 80, WetDays = 20);
-PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain,30);
-SynthRain = rainSeriesResults$SynthRain;
-SynthRain$PET = PETresults$SynthPET;
-SynthRain$K = PETresults$K;
-PETProb = PETresults$PETProb;   
-rainProb = rainSeriesResults$DaysProb;
-SynthRain = SynthRain %>% arrange(year, dayIndex);
+SynthRainEP = GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 900,  AnuualRain = 60, WetDays = 20)
 
 results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
 
-pdf(file = paste("plots/", format(Sys.time(), "%b_%d_%Y_%H%M"), "Results.pdf"), width = 30, height = 16);
-print(results);
-dev.off()
-SynthRain %>% filter(rain > 0) %>% summarise(mean(rain))
-SynthRainS%>% filter(rain > 0) %>% group_by(year) %>% summarise(s = sum(rain),n = n()) %>% summarise(mean(n), mean(s))
-#catch observed----
-
-
-
-res %>% ggplot(aes(factor, wetD)) + geom_line() +geom_point()
+SynthRainEP%>% filter(rain > 0) %>% group_by(year) %>% summarise(s = sum(rain),n = n()) %>% summarise(mean(n), mean(s))
 
 #tests---
-result = CalcGypsum(SynthRainE, duration = T1.10Observed$AvgAge[1], plotRes = 0, Depth = 100, rainSO4 = 11, dustFlux = 5, FieldCapacity = 0.1, AETFactor = 1.2, wieltingPoint = 0.016)
-plotSoilResults(results$zel11[[381]], T1.10Observed)
-bla = result$WD %>% group_by(milen = year %/% 1000) %>% summarise(max = max(meanWD), std = sd(meanWD), mean = mean(meanWD))
+test1 = CalcGypsum(SynthRainE, SynthRainEP, duration = T1.1Observed$AvgAge[1], Depth = 150)
+plotSoilResults(test1, T1.1Observed)
 
-ggplot(bla, aes(milen * 1000, mean)) + geom_line(size = 4, color = "blue") +
-labs(y = "Mean of seasonal WD[cm]", x = "Soil age [yr]") + scale_y_reverse() + geom_smooth(method = "gam", size = 2,color = "gray2") 
-
-save(resultsT1.1.par, file = "resultsPleis.RData")
+#print Data of measured profiles
+observedProfiles %>% group_by(SiteName) %>% summarise(gyp = sumGypsum(caso4, 5), depth = GetGypsicHorizonDepth(tibble(caso4, top, bottom)), age = mean(AvgAge)) %>% ggplot(aes(age, depth, color = SiteName, shape = grepl("Sh", SiteName))) + geom_point(size = 8)
 
 kiki1 = SynthRainE %>% filter(year == 1550, dayIndex >= 160 & dayIndex <= 161)
 
@@ -106,9 +86,8 @@ taliRain = as_tibble(taliRain) %>% left_join(SynthRain  %>% filter(year<=500)%>%
 
 #aggregateReuslts---
 
-
 test = resultsTable %>% filter(isHolocene) %>% groupByParam %>% calculatePareto() # %>% filter(!pareto) %>% calculatePareto %>% filter(!pareto) %>% calculatePareto
- test %>% filter(pareto) %>% dplyr::select(sulfate, dustFlux) %>% gather() %>% ggplot(aes(y = value, x = key)) + geom_boxplot() + geom_point()+scale_y_continuous(breaks = scales::extended_breaks(20)) + theme(axis.title.x = element_blank())
+ bla %>% filter(pareto) %>% dplyr::select(sulfate, dustFlux) %>% gather() %>% ggplot(aes(y = value, x = key)) + geom_boxplot() + geom_point()+scale_y_continuous(breaks = scales::extended_breaks(20)) + theme(axis.title.x = element_blank())
 test %>% filter(pareto) %>% dplyr::select(sulfate,dustFlux) %>% ungroup%>% summarise_all(median)
 
 #Test real rain----

@@ -120,7 +120,7 @@ GetImsRain = function(station = 347700 ,stationEvap = 347704) {
 
     return(IMSRain)
 }
-GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays = 0)
+GenerateRainSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays = 0)
 {
     DaysProb = CalculateProbabilities(IMSRain);    
     DepthLimit = 0.1
@@ -136,6 +136,7 @@ GenerateSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDays =
     #rain generator ---
     print("Calculating rain:")
     tic()
+    #if altered rain series
     if (AnuualRain != 0 & WetDays != 0) {
         if (stationName == "Eilat") {
             AltWB = AlternativeWeibullE(AnuualRain / WetDays);
@@ -408,4 +409,17 @@ AlternativeWeibullS = function(mean) {
     scale = fzero(fun, c(0.75, 30))[[1]];
     shape = 0.2 * log(scale) + 0.5042;
     return(list(scale = scale, shape = shape))
+}
+
+GenerateSeries = function(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 0, WetDays = 0) {
+    IMSRain = GetImsRain(station , stationEvap );
+    rainSeriesResults = GenerateRainSeries(NumOfSeries = NumOfSeries, IMSRain = IMSRain, AnuualRain = AnuualRain, WetDays = WetDays);
+    PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain, 30);
+    SynthRain = rainSeriesResults$SynthRain;
+    SynthRain$PET = PETresults$SynthPET;
+    SynthRain$K = PETresults$K;
+    PETProb = PETresults$PETProb;
+    rainProb = rainSeriesResults$DaysProb;
+    SynthRain = SynthRain %>% arrange(year, dayIndex);
+    return(SynthRain)
 }
