@@ -33,7 +33,7 @@ CSM::CSM()
 //flux is gram/cm2/day
 //dust concentration is mg/gram; rain concentration is mg/l
 Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint,
-	int FieldArea, double FieldCapacity, double DustGyp, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4)
+	int FieldArea, double FieldCapacity, double DustGyp, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4,bool withFC)
 {
 	Rcpp::Rcout << "years: " << years << endl <<
 		"Depth: " << Depth << endl <<
@@ -56,7 +56,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	int nWDComp = 0;
 	int nRainEvents = 0;
 	int nRainVecLength = rain.length();
-
+	float fDailyMaxGyp = 0;
+	int nCurrentMaxGyp = 0;
 	nTotalWhc = 0;
 	nTotalRain = 0;
 	nTotalCaLeachate = 0;
@@ -77,6 +78,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	wieltingPoint = WieltingPoint*thick ;//in cm
 	nFieldCapacity = FieldCapacity*thick;
 	RainArr = rain;
+	nTotalWhc = (nFieldCapacity - wieltingPoint) * nNumOfCompatments;//in cm
+
 
 	// flux is gram/cm2/day multiple by concentration % convert to mol/cm2/day	
 	nDailyDustGyp = dustFlux * DustGyp  / 172.172F; //gypsum molar waight  172.172
@@ -125,9 +128,12 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
 		year = day / 365;
-
+		int DustComp;
 		//field capacity increased with time
-		updateFieldCapacity(year);
+		if (firstDayInYear(year) && withFC) {
+			DustComp = updateFieldCapacity(year);
+		}
+
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
 		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration to get mg sulfate, convert to gram and multiply by atomic mass, to get mol
@@ -137,11 +143,11 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		
 		/*nTotalCaDust += nDust;
 		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
-		if (nTotalMoist >= (0.546*(nFieldCapacity - wieltingPoint) * nNumOfCompatments)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
+		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
 			AET = nDailyPET;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
 														//AET=PETdaily[monthperday[day]];
-		else if ((nTotalMoist > nTotalWP*1.001) && (nTotalMoist < 0.546*(nFieldCapacity - wieltingPoint) * nNumOfCompatments)) {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
-			AET = (nTotalMoist / (nFieldCapacity - wieltingPoint) * nNumOfCompatments)*nDailyPET;
+		else if ((nTotalMoist > nTotalWP*1.001) && (nTotalMoist < 0.546*nTotalWhc)) {										// the lower 55% of the total whc are according to modifeid Thornthwaite-Mather model
+			AET = (nTotalMoist / nTotalWhc)*nDailyPET;
 		}
 		else{// in case the soil is at WP, no evaporation
 			AET = 0;
@@ -172,21 +178,24 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			accumolateDustDays++;
 		}
 		
+		//Initiate counter for gypsum depth
+		fDailyMaxGyp = 0;
+		nCurrentMaxGyp = 0;
 
 		// This is the second loop that runs through the soil profile
 		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
 		{
 
 			//WASHING
-			if (Compartments[CurrentComp].nMoist > nFieldCapacity) 
+			if (Compartments[CurrentComp].nMoist > Compartments[CurrentComp].nFieldCapacity)
 			{				
 				// determines the leachate by substracting the field capacity from the moisture content
-				nLeachate = Compartments[CurrentComp].nMoist - nFieldCapacity;
+				nLeachate = Compartments[CurrentComp].nMoist - Compartments[CurrentComp].nFieldCapacity;
 				Compartments[CurrentComp].nFloodedCount++;
 				nWDComp = CurrentComp+1;
 			}
 			// in case the comp is floated without leaching
-			else if(Compartments[CurrentComp].nMoist == nFieldCapacity)			{			
+			else if(Compartments[CurrentComp].nMoist == Compartments[CurrentComp].nFieldCapacity)			{
 				
 				Compartments[CurrentComp].nFloodedCount++;
 				nLeachate = 0.0;				
@@ -224,10 +233,16 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			// only if moist change since yesterday
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
-				
-				Compartments[CurrentComp].solubility(nTemp);
-				
+				Compartments[CurrentComp].solubility(nTemp);	
+			}										
+			
+
+			if (Compartments[CurrentComp].C_CaSO4 > fDailyMaxGyp) {
+				fDailyMaxGyp = Compartments[CurrentComp].C_CaSO4;
+				nCurrentMaxGyp = CurrentComp;
 			}
+
+
 			if (firstDayInYear(day)) {
 				YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick);
 				YearCa[year] += mol2meqSoil(Compartments[CurrentComp].C_Ca, thick);;
@@ -236,7 +251,6 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 				if (Compartments[CurrentComp].C_CaSO4 > YearMaxGyp[year])
 				{
 					YearMaxGyp[year] = mol2meqSoil(Compartments[CurrentComp].C_CaSO4,thick);
-					gypDepth[year] = CurrentComp;
 				}
 			}
 				//	myfile << day << "," << CurrentComp << "," << nDailyRain * 0.001 << "," << nDailyAET * 0.001 << "," << Compartments[CurrentComp].nMoist * 0.001 << "," << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) <<",";
@@ -253,27 +267,29 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 				// ion are in mol
 				if (CurrentComp != nNumOfCompatments - 1) {
 					//adding the fractional quantitiy of matter
-					Compartments[CurrentComp + 1].C_Ca += Compartments[CurrentComp].C_Ca* nLeachate/((nFieldCapacity - wieltingPoint) +nLeachate);
-					Compartments[CurrentComp + 1].C_SO4 += Compartments[CurrentComp].C_SO4* nLeachate / ((nFieldCapacity - wieltingPoint) + nLeachate);
+					Compartments[CurrentComp + 1].C_Ca += Compartments[CurrentComp].C_Ca* nLeachate/((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) +nLeachate);
+					Compartments[CurrentComp + 1].C_SO4 += Compartments[CurrentComp].C_SO4* nLeachate / ((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) + nLeachate);
 					Compartments[CurrentComp + 1].nMoist += nLeachate;
 				}
 				else
 				{
 					//adding the fractional quantitiy of matter
-					nTotalCaLeachate += Compartments[CurrentComp].C_Ca* nLeachate / ((nFieldCapacity - wieltingPoint) + nLeachate);
-					nTotalSO4Leachate += Compartments[CurrentComp].C_SO4* nLeachate / ((nFieldCapacity - wieltingPoint) + nLeachate);
+					nTotalCaLeachate += Compartments[CurrentComp].C_Ca* nLeachate / ((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) + nLeachate);
+					nTotalSO4Leachate += Compartments[CurrentComp].C_SO4* nLeachate / ((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) + nLeachate);
 					nTotalLeachate += nLeachate;
 					nWDComp = CurrentComp;
 				}
 				//leaving  the fractional quantitiy of matter
-				Compartments[CurrentComp].C_Ca *= (nFieldCapacity - wieltingPoint) / ((nFieldCapacity - wieltingPoint) + nLeachate);
-				Compartments[CurrentComp].C_SO4 *= (nFieldCapacity - wieltingPoint) / ((nFieldCapacity - wieltingPoint) + nLeachate);
+				Compartments[CurrentComp].C_Ca *= (Compartments[CurrentComp].nFieldCapacity - wieltingPoint) / ((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) + nLeachate);
+				Compartments[CurrentComp].C_SO4 *= (Compartments[CurrentComp].nFieldCapacity - wieltingPoint) / ((Compartments[CurrentComp].nFieldCapacity - wieltingPoint) + nLeachate);
 				nLeachate = 0;
 			}		
 
 			nTotalMoist += Compartments[CurrentComp].nMoist;
 		}
 
+		//nnual avarege gyp depth
+		gypDepth[year] += (((float)nCurrentMaxGyp+0.5)*thick/365.0);
 
 		// Write to output
 		

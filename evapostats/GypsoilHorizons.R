@@ -53,13 +53,9 @@ remove(con)
 con = odbcConnect("soils")
 
 ##create dataframe from horizons
-dataframe = as_tibble(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caco3,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand as sand,Sieving_and_Pipette_Silt as silt ,Sieving_and_Pipette_Clay as clay,horizons.ColorMunsell,horizons.gravel,sites.MeanAnnualPrecipitation,sites.SiteName,sites.ITM_X_coordinate,sites.ITM_Y_coordinate,sites.AgeClass1 as ageclass,sites.AvgAge,sites.SoilType, list_desert.DesertID,list_desert.subregion  from horizons,sites,list_desert where (sites.siteid=horizons.siteid) and (sites.DesertID=list_desert.DesertID) and (horizons.siteid IN (select sites.siteid from sites where regionid = 94))", stringsAsFactors = F));
-ages = tibble(sqlQuery(con, "select ageclass,min_age,max_age from LUT_Age", stringsAsFactors = F));
-dataframe = dataframe %>% full_join(ages,"ageclass")
-dataframe$AvgAge = apply(dataframe[c("ageclass", "AvgAge","min_age","max_age")], 1, function(X) setAge(X[1],X[2],X[3],X[4]))
+dataframe = as_tibble(sqlQuery(con, "select horizons.siteid,horizons.horizon,horizons.depthroof,horizons.depthbase,horizons.caso4,horizons.Sieving_and_Pipette_Total_Sand as sand,Sieving_and_Pipette_Silt as silt ,Sieving_and_Pipette_Clay as clay,horizons.gravel,sites.MeanAnnualPrecipitation,sites.SiteName,sites.AvgAge,sites.SoilType, list_desert.DesertID,list_desert.subregion  from horizons,sites,list_desert where (sites.siteid=horizons.siteid) and (sites.DesertID=list_desert.DesertID) and (horizons.siteid IN (select sites.siteid from sites where regionid = 94)) and (sites.SoilType = 859)", stringsAsFactors = F));
 
-#filter by regsols
-dataframe = dataframe[which(dataframe$SoilType == 859),]
+
 
 #divide to group according to percipation
 range = unique(dataframe$MeanAnnualPrecipitation);
@@ -87,7 +83,9 @@ caso4.slab.siteid = as_tibble(slab(AQPClass, fm = SiteName ~ caso4 + gravel + si
 #this is for the strips
 write_csv(caso4.slab.siteid, path = "DB\\MeasuredDataProfiles.csv")
 
-caso4.slab.siteid %>% filter(AvgAge < 18000) %>% summarise_all(mean)
+
+
+caso4.slab.siteid %>% filter(grepl("T", SiteName)) %>% ggplot(aes(SiteName, top, color = gravel)) + geom_point() + scale_color_gradientn(colors = rainbow(4)) + scale_y_reverse()
 
 #data for plotting 
 dataplot = (caso4.slab.siteid)

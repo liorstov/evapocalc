@@ -24,7 +24,7 @@ class CSM
 public:
 	CSM();
 	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick,
- double WieltingPoint,int FieldArea, double FieldCapacity, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4);
+ double WieltingPoint,int FieldArea, double FieldCapacity, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4,bool withFC);
 	std::vector<Compartment>* GetCompartments();
 	Rcpp::NumericMatrix output2Matrix(Rcpp::DoubleVector & inputVector, bool verbose);
 	double meqSoil2molar(double, double,double);
@@ -58,11 +58,28 @@ public:
 		return(!((day + 1) % 365));
 	}
 
-//holocene profile have 0.1 FC and plesitocene profiles have 0.2 FC. a linear function updates the fc every year
-	inline void updateFieldCapacity(int year) {
-		if (year > 10000)
-			nFieldCapacity = (year / 500000 + 0.08)*thick;
-		
+//holocene profile have 0.1 FC and plesitocene profiles have 0.19 FC. a linear function updates the fc every year
+	inline int updateFieldCapacity(int year) {
+		if (year > 10000) {
+			int CompDuration = 12500;
+			int DustComp = (year-10001)/ (int)CompDuration;
+			float yearsInProcess = (year - 10001) % CompDuration;
+			//x is yearsinprocess and 0.01 is b and 
+			Compartments[DustComp].nFieldCapacity = ((yearsInProcess)*0.09/ (float)CompDuration +0.1)*thick;
+			
+			updateTotalWHC();
+
+			//Rcout << year <<"   " <<DustComp <<"  "<< Compartments[DustComp].nFieldCapacity/thick<<"   WHC" << nTotalWhc << endl;
+			return(DustComp);
+		}		
+	}
+
+	inline void updateTotalWHC() {
+		nTotalWhc = 0.0;
+		for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
+			nTotalWhc += (it->nFieldCapacity - it->nThetaWeildingPnt);
+		}
+
 	}
 
 

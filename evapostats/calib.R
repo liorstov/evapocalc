@@ -2,7 +2,7 @@ require(parallel)
 load("synth.RData")
 cl <- makeCluster(5, type = "PSOCK")
 
-clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1Observed", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1Observed"))
+clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1"))
 
 clusterEvalQ(cl, {
     require(tidyverse)
@@ -51,8 +51,8 @@ resultsTable = bind_rows(
     RMSD.T1.9 = RectanglingResults(results$T1.9, c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9", isHolocene = T),
     RMSD.Zel11 = RectanglingResults(results$zel11, c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
 #RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
-#RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
-#RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1Observed %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
+#RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1 %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
+#RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1 %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
 )
 resultsTable = resultsTable %>% mutate(optimal = ifelse(FC == opt.FC & AETF == opt.AETF & sulfate == opt.sulfate & dustFlux == opt.dust & WP == opt.WP, T, F)) %>%
     mutate(region = ifelse(profile %in% c("zel11", "zel1"), "zeelim", "shehoret"))

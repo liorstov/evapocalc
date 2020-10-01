@@ -1,6 +1,6 @@
 CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, duration, Depth = 150, thick = 5, wieltingPoint = opt.WP,
                          nArea = 1, FieldCapacity = opt.FC, DustGyp = 0.005, AETFactor = opt.AETF,
-                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T, distribution = F, rainstat = F,withRunoff = T) {
+                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T, distribution = F, rainstat = F,withRunoff = T,withFC = T) {
 
 
 
@@ -35,7 +35,7 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
             raindata = raindata %>% mutate(origRain = rain)
         }
 
-        rainStat = getSeriesMeans(raindata)
+        rainStat = getSeriesMeans(rainPleistocene)
     } else {
         print("holocene profile")
         if (random) {
@@ -57,7 +57,7 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
     print("run model")
     tic()
     list = b$Calculate(raindata$rain, raindata$PET, duration, Depth, thick, wieltingPoint, nArea, FieldCapacity,
-                   DustGyp, AETFactor, verbose, dustFlux / 10000 / 365, rainCa, rainSO4);
+                   DustGyp, AETFactor, verbose, dustFlux / 10000 / 365, rainCa, rainSO4, withFC);
     toc()
     list$thick = thick;
 
@@ -78,6 +78,7 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
     list$AnnualRain = mean(rainStat$annual);
     list$q99 = rainStat %>% pull(max) %>% quantile(0.99) %>% as.numeric
     list$exc = rainStat %>% tally(max > 50) %>% as.numeric
+    list$PET = mean(rainStat$PET, na.rm = T);
     if (distribution) {
         WeibullScaleShape = raindata %>% filter(rain > 0.1) %>% pull(rain) %>% fitdist("weibull", method = "mle")
         list$WBShape = WeibullScaleShape$estimate[1]
@@ -124,10 +125,24 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
         list$WD = NULL
     }
     #  list$WD = DayWD %>% filter(WD != 0) %>% mutate(year = day %/% 365) %>% group_by(year) %>% summarise(max = max(WD), sd = sd(max)) %>% mutate(cent = year %/% 100) %>% group_by(cent) %>% summarise(mean = mean(max), p80 = quantile(max, 0.8), sd = sd(max), var = var(max));
-
+    list$WD = Seasonal
     return(list)
 }
 
+#return not rmsd but sqrDiff netween obs abd res
+RectanglingResults = function(res, obs) {
+
+    ObsDepth = GetGypsicHorizonDepth(obs)
+    ObsMaxGyp = GetGypsicHorizonConc(obs)
+
+    obs = obs %>% pull(correctedMean)
+    ObsGyp = sumGypsum(obs, 5);
+    #calculate target function
+    rmsdTable = res %>% map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF,PET = .x$PET, dustFlux = .x$DF, PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick),
+        total = sumGypsum(.x$gypsum, .x$thick), SWDp80 = .x$SWDp80, obsTop = ObsDepth$top, obsBottom = ObsDepth$bottom, ObsGyp))) %>% rowid_to_column()
+    return(rmsdTable)
+
+}
 
 GetRandomValue <- function(X) {
     # if its a rain day
@@ -185,7 +200,7 @@ LOOCV = function(CV) {
 
 
 getSeriesMeans = function(series) {
-    series %>% group_by(year) %>% summarise(n = sum(rain > 0.1),origAnnual = sum(origRain), annual = sum(rain), max = max(rain), sd = sd(rain), PET = sum(PET), meanPET = mean(PET))
+    series %>% group_by(year) %>% summarise(n = sum(rain > 0.1), annual = sum(rain), max = max(rain), sd = sd(rain), PET = sum(PET), meanPET = mean(PET))
 }
 getDaysDuration = function(series) {
     temp = series %>% filter(rain > 0.1) %>% mutate(duration = ifelse(dayIndex - lag(dayIndex) == 1, 1, 0)) %>% group_by(year, grp = with(rle(duration), rep(seq_along(lengths), lengths)))  %>% summarise(duration = sum(duration) + 1) %>% group_by(year) %>% summarise(maxDuration = max(duration), meanDuration = mean(duration))
@@ -247,16 +262,20 @@ GetSensitivityFromResults = function(resultsTable) {
 }
 
 loadObsProfiles = function() {
-    observedProfiles = read_csv("DB\\MeasuredDataProfiles.csv") 
-    Zel11Observed <<- observedProfiles %>% filter(str_detect(SiteName, "11"))
-    Zel12Observed <<- observedProfiles %>% filter(str_detect(SiteName, "12"))
-    Zel13Observed <<- observedProfiles %>% filter(str_detect(SiteName, "13"))
-    Zel1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL1$"))
-    Zel2Observed <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL2$"))
-    T1.9Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
-    T1.10Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
-    T1.1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T1-1$"))
-    T2.1Observed <<- observedProfiles %>% filter(str_detect(SiteName, "T2-1$"))
+    observedProfiles<<- read_csv("DB\\MeasuredDataProfiles.csv") 
+    Zel11 <<- observedProfiles %>% filter(str_detect(SiteName, "11"))
+    Zel12 <<- observedProfiles %>% filter(str_detect(SiteName, "12"))
+    Zel13 <<- observedProfiles %>% filter(str_detect(SiteName, "13"))
+    Zel1 <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL1$"))
+    Zel2 <<- observedProfiles %>% filter(str_detect(SiteName, "ZEL2$"))
+    T1.9 <<- observedProfiles %>% filter(str_detect(SiteName, "T1-9"))
+    T1.10 <<- observedProfiles %>% filter(str_detect(SiteName, "T1-10"))
+    T1.1 <<- observedProfiles %>% filter(str_detect(SiteName, "T1-1$"))
+    T2.1 <<- observedProfiles %>% filter(str_detect(SiteName, "T2-1$"))
+    T2.10 <<- observedProfiles %>% filter(str_detect(SiteName, "T2-10"))
+    Talus1 <<- observedProfiles %>% filter(str_detect(SiteName, "Talus"))
+    SH1 <<- observedProfiles %>% filter(str_detect(SiteName, "Sheoheret 1"))
+    SH3 <<- observedProfiles %>% filter(str_detect(SiteName, "Sheoheret 3"))
 }
 comp2Depth = function(comp, thick) {
     return((comp - 1 + 0.5) * thick)
@@ -271,11 +290,11 @@ plotSoilResults = function(res, observed ) {
     WP1 = ggplot(resLeach, aes(y = depth, x = gypsum, fill = factor, alpha = (inMeasured))) + scale_y_reverse(expand = c(0, 0.0)) +
                     scale_x_continuous(name = "gypsum mEq/100g soil", expand = c(0, 0.0)) +
                     theme(axis.text.x = element_text(size = 20, angle = 0, hjust = 1), legend.title = element_blank()) +
-                    guides(fill = guide_legend(reverse = TRUE),alpha = F) +
-                   geom_bar(stat = "identity", position = "dodge") + scale_fill_manual(values = c("brown2", "grey45")) + scale_alpha_discrete(range = c(1,0.5))+
+                    guides(fill = guide_legend(reverse = TRUE), alpha = F) +
+                   geom_bar(stat = "identity", position = "dodge") + scale_fill_manual(values = c("brown2", "grey45")) + scale_alpha_discrete(range = c(1, 0.5)) +
     #geom_line(aes(x = depth, y = Ca, color = "Ca")) +
     #geom_line(aes(x = depth, y = SO4, color = "SO4")) +
-    ggtitle(paste("duration = ", res$duration, "; daily dust flux = ", round(res$DF*1000,3), "mg/cm3/day; dust SO4 = ", res$DSO4, "mg/g; Rain SO4 = ", res$RSO4,"mg/L; annual rain = \n",res$AnnualRain,"  rain days = ", res$rainDays)) +
+    ggtitle(paste("duration = ", res$duration, "; daily dust flux = ", round(res$DF * 1000, 3), "mg/cm3/day; dust SO4 = ", res$DF, "mg/g; Rain SO4 = ", res$RSO4, "mg/L; annual rain = \n", round(res$AnnualRain), "  rain days = ", round(res$rainDays), ";\ttotal simulated gypsum = ", round(sumGypsum(res$gypsum, 5)), ";     total observed gypsum = ", round(sumGypsum(observed$correctedMean, 5)))) +
     #geom_vline(aes(xintercept = res$SMeanWD, color = paste("MeanSWD = ", res$SMeanWD))) +
     #geom_vline(aes(xintercept = res$Index03, color = paste("Index3 = ", res$Index03))) +
     geom_hline(aes(yintercept = res$SWDp80, color = paste("SWDp80 = ", res$SWDp80)), linetype = 2, size = 2) + scale_color_manual(values = "orange")
@@ -316,18 +335,6 @@ plotSoilResultsRMSD = function(res, obs, CalibArray) {
 
 }
 
-#return not rmsd but sqrDiff netween obs abd res
-RectanglingResults = function(res, obs) {
-
-    ObsDepth = GetGypsicHorizonDepth(obs)
-    obs = obs %>% pull(correctedMean)
-    
-    #calculate target function
-    rmsdTable = res %>% map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, sqrDiff = sqrDiff(.x$gypsum, obs), RMSD = rmsd(.x$gypsum, obs), biasConc = biasConc(.x$gypsum, obs, .x$thick), PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick), biasDepth = abs(PeakDepth-ObsDepth), comps = length(obs), sd = .x$sd, max = .x$max,
-        total = sumGypsum(.x$gypsum, .x$thick), SMeanWD = .x$SMeanWD, SWDp80 = .x$SWDp80, q99 = .x$q99, maxWD = .x$maxWD, exc = .x$exc))) %>% rowid_to_column()
-    return(rmsdTable)
-
-}
 groupByParam = function(res) {
     groupTable = res %>% group_by(sulfate, dustFlux) %>% summarise(totalConc = sum(total), sumSqrDiff = sum(sqrDiff), min = quantile(sqrDiff, 0.05), max = quantile(sqrDiff, 0.95), sd = sd(sqrDiff), n = n(), comps = sum(comps), bias = mean(bias), PeakDepth = mean(PeakDepth), PeakConc = mean(PeakConc), minRMSD = joinRMSD(min, comps), RMSD = joinRMSD(sumSqrDiff, comps), maxRMSD = joinRMSD(max, comps)) %>% ungroup()
     return(groupTable)
@@ -531,7 +538,7 @@ Theta.r = function(silt, clay) {
     return(rosetta$theta_r)
 }
 addElementToResults = function() {
-    results = results %>% modify_depth(2, ~ list_modify(.x, rainQuantiles = ifelse(is.na(.x$rainQuantiles[1]), list(rep(NA, 11)), .x$rainQuantiles)))
+    results = results %>% modify_depth(2, ~ list_modify(.x, PET = ifelse(is.na(.x$PET), NA, .x$PET)))
     results = results %>% modify_depth(2, ~ list_modify(.x, duration = 0))
     bla = results$zel1 %>% map_depth(1, pluck("q99")) %>% map_df(tibble) %>% mutate(length("<list>"))
 }
@@ -551,6 +558,10 @@ GetResultsInRectangle = function(res, obs,sizeInPercent) {
 }
 
 GetGypsicHorizonDepth = function(obs) {
-    obs %>% arrange(desc(top)) %>% group_by(caso4) %>% slice(1) %>% tail(1) %>% pull(bottom)
-    return(obs %>% group_by(caso4) %>% summarise(bottom =mean(bottom)) %>% tail(1) %>% pull(bottom))
+   # obs %>% arrange(desc(top)) %>% group_by(caso4) %>% slice(1) %>% tail(1) %>% pull(bottom);
+    return(obs %>% group_by(correctedMean) %>% summarise(top = min(top), bottom = max(bottom)) %>% tail(1));
+}
+GetGypsicHorizonConc = function(obs) {
+    # obs %>% arrange(desc(top)) %>% group_by(caso4) %>% slice(1) %>% tail(1) %>% pull(bottom);
+    return(obs %>% group_by(correctedMean) %>% summarise(bottom = mean(bottom)) %>% tail(1) %>% pull(correctedMean));
 }

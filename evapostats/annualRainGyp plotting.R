@@ -1,6 +1,6 @@
 #print gypsum path
-test %>% map_dfc(~tibble(gyp = .x$YearGyp, maxGyp = .x$YearMaxGyp * 8, gyp_depth = (.x$gypDepth + 0.5) * 40)) %>% mutate_all(~MovingAvarage(.x, 100, 100)) %>% rowid_to_column(var = "year") %>% gather("profile", "totalGypsum", - year) %>% ggplot(aes(year, totalGypsum, color = profile)) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "total gypsum [meq]", sec.axis = sec_axis(~. / 8, name = "Gypsic Horizon [meq] / horizon depth[cm]")) + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8)))
-test1 %>% list %>% map_dfc(~tibble(runoff = 100 * (1 - .x$rainStat$annual / .x$rainStat$origAnnual))) %>% mutate_all(~MovingAvarage(.x, 100, 100)) %>% rowid_to_column(var = "year") %>% ggplot(aes(year, runoff)) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "runoff [%]") + xlab("duration [yr]")
+draw = list(test1,test2,test3,test4) %>% map_dfc(~tibble(gyp = .x$YearGyp, gyp_depth = .x$gypDepth,module = factor(.x$module)))  %>% rowid_to_column(var = "year")#%>% mutate_all(~MovingAvarage(.x, 100, 100))
+draw %>% gather("profile", "totalGypsum", - year,-module) %>% mutate(categ = ifelse(str_detect(profile, "depth"), "depth", "concentration")) %>% ggplot(aes(year, totalGypsum, color = (module))) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "total gypsum [meq]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "with FC module") + facet_wrap(strip.position = NULL, ncol = 2, categ ~ .,scales = "free_y") + scale_color_brewer(type = "qual", palette = 2)
 
 bla = results$T1.10[c(1)] %>% map_dfc(~tibble(.x$rainStat, gyp = .x$YearGyp, maxgyp = .x$YearMaxGyp, so4 = .x$YearSulfate, ca = .x$YearCa)) %>% mutate(gypagg = gyp - lag(gyp), caagg = ca - lag(ca), so4agg = so4 - lag(so4))
 bla %>% dplyr::select(gyp, gyp1, year, PET, PET1) %>% mutate_all(~MovingAvarage(.x, 100)) %>% gather("profile", "value", - year) %>%
@@ -15,3 +15,10 @@ bla %>% filter(gypagg < 0) %>% ggplot(aes(annual, gypagg)) + geom_point() + coor
 bla %>% ggplot(aes(annual, gypagg, color = n)) + geom_point() + coord_cartesian(ylim = c()) + scale_color_gradientn(colours = rainbow(5, rev = T))
 
  colnames(bla) = c("gyp", "maxGyp", "gyp_depth", "gyp_NoRunoff", "maxGyp_NoRunoff", "gyp_depth_NoRunoff")
+
+
+draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(year = 1:length(.x$YearGyp), gyp = .x$YearGyp / 30, gyp_depth = .x$gypDepth, module = (.x$module)))
+draw %>% gather("profile", "totalGypsum", - year, - module) %>% mutate(categ = ifelse(str_detect(profile, "depth"), "depth", "concentration")) %>% ggplot(aes(year, totalGypsum, color = (module))) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "total gypsum [meq]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "with FC module") + facet_wrap(strip.position = NULL, ncol = 2, categ ~ ., scales = "free_y") + scale_color_brewer(type = "qual", palette = 2) 
+
+draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(.x$WD[, 1:2], module = (.x$module))) %>% mutate(maxWD = MovingAvarage(maxWD, 100, 100))
+draw  %>% ggplot(aes(year, maxWD, color = (module))) + geom_point() +coord_cartesian(xlim =  c(50000,60000))+ scale_y_reverse(name = "annual maximad WD [cm]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "")  + scale_color_brewer(type = "qual", palette = 2)

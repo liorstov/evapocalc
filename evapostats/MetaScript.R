@@ -1,7 +1,6 @@
 
 #load("C:/Users/liorst/Source/Repos/evapocalc/.RData")
 load("C:/Users/liorst/Source/Repos/evapocalc/synth.RData")
-load(file = "C:/Users/liorst/Source/Repos/evapocalc/resultsList3.RData")
 
 require(tidyverse)
 require(Rcpp)
@@ -38,7 +37,7 @@ theme_set(theme_classic() + theme(legend.key.size = unit(1, "line"), legend.text
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
 strip.text = element_text( size = 20),
 axis.text.y = element_text(size = 28),
-axis.title.y = element_text(size = 28, margin = margin(t = 0, r = 10, b = 0, l = 0)), axis.text.y.right = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
+axis.title.y = element_text(size = 35,margin = margin(t = 0, r = 10, b = 0, l = 0)), axis.text.y.right = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
 axis.title.x = element_text(size = 35),
 legend.key.height = unit(3, "line"),
 panel.grid.major = element_line(colour = "grey93"),
@@ -62,21 +61,42 @@ b <<- new(CSMCLASS);
 #stationElat = 347700;
 #stationElatEvap = 347704;
 #stationSedom = 337000;
-SynthRainEP = GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 900,  AnuualRain = 60, WetDays = 20)
+factor = tibble(key = numeric(), value = numeric())
+for (item in seq(0.1,1,by = 0.1)) {
+    test = GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 60, PETfactor = item)
+    value = test %>% group_by(year) %>% summarise_all(sum) %>% summarise_all(mean) %>% pull(PET)
+    factor = factor %>% add_row(key = item, value = value)
+}
+factorS = tibble(key = numeric(), value = numeric())
+for (item in seq(0.1, 1, by = 0.1)) {
+    test = GenerateSeries(station = 337000, stationEvap = 337000, PETfactor = 1, NumOfSeries = 60)
+    value = test %>% group_by(year) %>% summarise_all(sum) %>% summarise_all(mean) %>% pull(PET)
+    factorS = factorS %>% add_row(key = item, value = value)
+}
 
+
+SynthRainEP= GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 90, WetDays = 15)
+IMSRain = GetImsRain(station = 347700, stationEvap = 347704)
 results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
 
-SynthRainEP%>% filter(rain > 0) %>% group_by(year) %>% summarise(s = sum(rain),n = n()) %>% summarise(mean(n), mean(s))
+IMSRain %>% filter(rain > 0) %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n(),PET = sum(pen)) %>% drop_na() %>% summarise(mean(n), mean(s), mean(PET,na.rm = T))
 
 #tests---
-test1 = CalcGypsum(SynthRainE, SynthRainEP, duration = T1.1Observed$AvgAge[1], Depth = 150)
-plotSoilResults(test1, T1.1Observed)
+test1 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T,withFC = T)
+test2 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T,withFC = F)
+test3 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F,withFC = T)
+test4 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F, withFC = F)
+test1$module = "FC and runoff"
+ test2$module = "runoff only"
+ test3$module = "FC only"
+ test4$module = "no FC no runoff"
+plotSoilResults(test1, Zel1)
 
 #print Data of measured profiles
 observedProfiles %>% group_by(SiteName) %>% summarise(gyp = sumGypsum(caso4, 5), depth = GetGypsicHorizonDepth(tibble(caso4, top, bottom)), age = mean(AvgAge)) %>% ggplot(aes(age, depth, color = SiteName, shape = grepl("Sh", SiteName))) + geom_point(size = 8)
 
 kiki1 = SynthRainE %>% filter(year == 1550, dayIndex >= 160 & dayIndex <= 161)
-
+    
 
 taliRain = readMat("DB\\RainTali.mat")
 taliRain = as_tibble(taliRain$data) %>% dplyr::select(year = V1, dayIndex = V2, rain = V3)
@@ -256,7 +276,7 @@ aWP2 = plotSoilResultsAgg(results$s9 %>% keep(~.x$RSO4 == 15 & .x$DF == 7), c(T1
 aWP3 = plotSoilResultsAgg(results$zel11 %>% keep(~.x$RSO4 == optimal[3,1] & .x$DF == 6), c(Zel11Observed %>% pull(mean)), "zel11 - Zeelim")
 aWP3 = plotSoilResultsAgg(bla, c(T1.1Observed[1:20,] %>% pull(mean)), "zel11 - Zeelim")
 res = rbind(aWP1[[2]], aWP2[[2]], aWP3[[2]])
-#WP4 = plotSoilResultsAgg(list(result), c(T2.1Observed  %>% pull(mean)), "T2.1")
+#WP4 = plotSoilResultsAgg(list(result), c(T2.1  %>% pull(mean)), "T2.1")
 #WP5 = plotSoilResultsAgg(results$zel13 %>% keep(~.x$RSO4 == 4 & .x$DF == 3.5), c(Zel13Observed %>% pull(mean)), "zel13")
 plot_grid(aWP1, aWP2, aWP3, nrow = 2, legend = get_legend(aWP1),axis = "t")
 

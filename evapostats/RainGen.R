@@ -411,15 +411,18 @@ AlternativeWeibullS = function(mean) {
     return(list(scale = scale, shape = shape))
 }
 
-GenerateSeries = function(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 0, WetDays = 0) {
+GenerateSeries = function(station = 347700, stationEvap = 347704, NumOfSeries = 1000, AnuualRain = 0, WetDays = 0, PETfactor = 1) {
+    if (PETfactor != 1) { 
+        PETfactor = ifelse(station == 347700, PETfactor * 0.0005, PETfactor * 0.0004)
+    }
     IMSRain = GetImsRain(station , stationEvap );
     rainSeriesResults = GenerateRainSeries(NumOfSeries = NumOfSeries, IMSRain = IMSRain, AnuualRain = AnuualRain, WetDays = WetDays);
     PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain, 30);
     SynthRain = rainSeriesResults$SynthRain;
-    SynthRain$PET = PETresults$SynthPET;
+    SynthRain$PET = PETresults$SynthPET * PETfactor;
     SynthRain$K = PETresults$K;
     PETProb = PETresults$PETProb;
     rainProb = rainSeriesResults$DaysProb;
-    SynthRain = SynthRain %>% arrange(year, dayIndex);
+    SynthRain = SynthRain %>% arrange(year, dayIndex) %>% dplyr::select(year,rain ,PET);
     return(SynthRain)
 }

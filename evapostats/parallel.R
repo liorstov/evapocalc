@@ -2,7 +2,7 @@ require(parallel)
 load("synth.RData")
 cl <- makeCluster(4, type = "PSOCK")
 
-clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1Observed", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1Observed"))
+clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1"))
 
 clusterEvalQ(cl, {
     require(tidyverse)
@@ -75,8 +75,8 @@ for (i in 1:nrow(array)) {
     clusterExport(cl, "SynthRainSP")
 
 
-    #results$T2.1 = c(results$T2.1, parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = T2.1Observed$AvgAge[1], plotRes = 0, Depth = tail(T2.1Observed$bottom, 1), DustGyp = 0.01, rainSO4 = rainDustArray[X, 1], dustFlux = rainDustArray[X, 2], FieldCapacity = 0.15)))
-    #results$zel1 = c(results$zel1, parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, SynthRainSP, duration = Zel1Observed$AvgAge[1], plotRes = 0, Depth = tail(Zel1Observed$bottom, 1), DustGyp = 0.01, rainSO4 = rainDustArray[X, 1], dustFlux = rainDustArray[X, 2], FieldCapacity = 0.15)))
+    #results$T2.1 = c(results$T2.1, parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = T2.1$AvgAge[1], plotRes = 0, Depth = tail(T2.1$bottom, 1), DustGyp = 0.01, rainSO4 = rainDustArray[X, 1], dustFlux = rainDustArray[X, 2], FieldCapacity = 0.15)))
+    #results$zel1 = c(results$zel1, parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainS, SynthRainSP, duration = Zel1$AvgAge[1], plotRes = 0, Depth = tail(Zel1$bottom, 1), DustGyp = 0.01, rainSO4 = rainDustArray[X, 1], dustFlux = rainDustArray[X, 2], FieldCapacity = 0.15)))
     #results$T1.1 = c(results$T1.1, parLapply(cl, 1:10, fun = function(X) CalcGypsum(SynthRainE,SynthRain, duration = 62400, plotRes = 0, Depth = tail(T1.1Observed$bottom, 1))))
 
     #rain sens ---
@@ -132,8 +132,8 @@ resultsTable = bind_rows(
     RMSD.T1.9 = RectanglingResults(results$T1.9 %>% flatten, c(T1.9Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.9", isHolocene = T),
     RMSD.Zel11 = RectanglingResults(results$zel11 %>% flatten, c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
     #RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
-    #RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
-    #RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1Observed %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
+    #RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1 %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
+    #RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1 %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
 )
 future::plan(strategy = sequential)
 resultsTable = resultsTable %>% mutate(optimal = ifelse(FC == opt.FC & AETF == opt.AETF & sulfate == opt.sulfate & dustFlux == opt.dust & WP == opt.WP, T, F)) %>%

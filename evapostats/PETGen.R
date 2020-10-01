@@ -69,10 +69,15 @@ PETGen <- function(SynthRain, IMSRain, windowSize = 30, windowSize2 = NULL)
 
     #representing every day
     #then pasting 2d moving avarage for every 30 days
-    K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>%
-                    mutate(smoothMean = map2_dbl(K, dayIndex, ~ smoothMean(.x, .y, IMSPenOnly, windowSize)), smoothSTD = map2_dbl(K, dayIndex, ~ smoothStd(.x, .y, IMSPenOnly, windowSize))) %>%
-                    mutate(smoothMean = replace_na(smoothMean, 0), smoothSTD = replace_na(smoothSTD,0))
-   
+    #tic()
+    #K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>%
+                    #mutate(smoothMean = map2_dbl(K, dayIndex, ~ smoothMean(.x, .y, IMSPenOnly, windowSize)), smoothSTD = map2_dbl(K, dayIndex, ~ smoothStd(.x, .y, IMSPenOnly, windowSize))) %>%
+                    #mutate(smoothMean = replace_na(smoothMean, 0), smoothSTD = replace_na(smoothSTD, 0))
+    #toc()
+    K.month.table = tibble(K = rep(1:3, each = 365), dayIndex = rep(seq(365), 3)) %>% left_join(IMSPenOnly, by = c("K", "dayIndex")) %>% group_by(K, dayIndex) %>% summarise(pen = mean(pen)) %>%
+                    group_by(K) %>% group_modify(~tibble(dayIndex = .x$dayIndex, smoothMean = MovingAvarage(x = .x$pen, win1 = 30), smoothSTD = MovingAvarageSD(x = .x$pen, win1 = 30))) %>%
+                    mutate(smoothMean = replace_na(smoothMean, 0), smoothSTD = replace_na(smoothSTD, 0))
+
     PET.rainfall.series = SynteticPetGen(K.month.table, SynthRain)
     toc() 
     return(list(SynthPET = PET.rainfall.series$PET,K = PET.rainfall.series$K, PETProb = K.month.table));
