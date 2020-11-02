@@ -24,7 +24,7 @@ opt.AETF <<- 1.2;
 opt.WP <<- 0.013;
 opt.FC <<- 0.1;
 opt.sulfate <<- 10;
-opt.dust <<- 6;
+opt.dust <<- 2;
 opt.WHC <<- 0.087
 seq.WHC = seq(0.8, 1.2, by = 0.2) * opt.WHC %>% rep(60);
 seq.AETF = seq(0.8, 1.2, by = 0.2) * opt.AETF %>% rep(60);
@@ -55,7 +55,7 @@ source("evapostats/RainGen.R");
 loadObsProfiles()
 
 Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-b <<- new(CSMCLASS);
+cppModule <- new(CSMCLASS);
 
 #rain gen ----
 #stationElat = 347700;
@@ -75,22 +75,38 @@ for (item in seq(0.1, 1, by = 0.1)) {
 }
 
 
-SynthRainEP= GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 90, WetDays = 15)
-IMSRain = GetImsRain(station = 347700, stationEvap = 347704)
+SynthRainEP= GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 70, WetDays = 15)
+IMSRain = GetImsRain(station = 337000, stationEvap = 337000)
 results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
 
 IMSRain %>% filter(rain > 0) %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n(),PET = sum(pen)) %>% drop_na() %>% summarise(mean(n), mean(s), mean(PET,na.rm = T))
 
+result = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = F, random = T, withRunoff = T, withFC = T,rainSO4 = 13)
+plotSoilResults(results[[1]], T1.1,T)
+
+
 #tests---
-test1 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T,withFC = T)
-test2 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T,withFC = F)
-test3 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F,withFC = T)
-test4 = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F, withFC = F)
+test = lapply(1:100, FUN = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = 62000-5000, Depth = 150, rainstat = F, random = T))
+
+testOSL1 = parLapply(cl, 1:1, fun = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = 62500, Depth = 150, rainstat = F, random = T, withFC = T, withRunoff = T, rainSO4 = 55)) 
+testOSL3 = parLapply(cl, 1:40, fun = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = (62000 + 5000), Depth = 150, rainstat = F, random = T, withFC = F, withRunoff = T))
+testOSL2 = parLapply(cl, 1:40, fun = function(X) CalcGypsum(SynthRainE, SynthRainEP, duration = (62000 - 5000), Depth = 150, rainstat = F, random = T, withFC = F, withRunoff = T))
+
+test1 = CalcGypsum(SynthRainS, SynthRainS, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T, withFC = T, getWD = T)
+test2 = CalcGypsum(SynthRainS, SynthRainS, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = T, withFC = F, getWD = T)
+test3 = CalcGypsum(SynthRainS, SynthRainS, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F, withFC = T, getWD = T)
+test4 = CalcGypsum(SynthRainS, SynthRainS, duration = 60000, Depth = 150, rainstat = T, random = F, withRunoff = F, withFC = F, getWD = T)
 test1$module = "FC and runoff"
  test2$module = "runoff only"
  test3$module = "FC only"
  test4$module = "no FC no runoff"
 plotSoilResults(test1, Zel1)
+
+rect = c(testOSL1, testOSL2, testOSL3) %>% RectanglingResults(T1.1)
+rect %>% group_by(duration) %>% summarise(min(total), max(total), min(PeakDepth), max(PeakDepth))
+rect = rect %>% rowwise() %>% mutate(xmin = 40, xmax = 60.5, ymin = 47.5, ymax = 47.5, inrange = (between(total, xmin, xmax) & between(PeakDepth, ymin, ymax))) %>% ungroup()
+rect %>% group_by(duration) %>% summarise(sum(as.integer(inrange))/ n(), mean(total), median(PeakDepth))
+rect %>% ggplot(aes(factor(duration), total)) + geom_boxplot(outlier.color = NA) + coord_cartesian() + scale_y_reverse() #+ geom_rect(aes(xmin = 40, xmax = 60.5, ymin = 47.5, ymax = 47.5), fill = NA, color = "black")
 
 #print Data of measured profiles
 observedProfiles %>% group_by(SiteName) %>% summarise(gyp = sumGypsum(caso4, 5), depth = GetGypsicHorizonDepth(tibble(caso4, top, bottom)), age = mean(AvgAge)) %>% ggplot(aes(age, depth, color = SiteName, shape = grepl("Sh", SiteName))) + geom_point(size = 8)

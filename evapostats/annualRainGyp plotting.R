@@ -17,8 +17,10 @@ bla %>% ggplot(aes(annual, gypagg, color = n)) + geom_point() + coord_cartesian(
  colnames(bla) = c("gyp", "maxGyp", "gyp_depth", "gyp_NoRunoff", "maxGyp_NoRunoff", "gyp_depth_NoRunoff")
 
 
-draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(year = 1:length(.x$YearGyp), gyp = .x$YearGyp / 30, gyp_depth = .x$gypDepth, module = (.x$module)))
-draw %>% gather("profile", "totalGypsum", - year, - module) %>% mutate(categ = ifelse(str_detect(profile, "depth"), "depth", "concentration")) %>% ggplot(aes(year, totalGypsum, color = (module))) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "total gypsum [meq]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "with FC module") + facet_wrap(strip.position = NULL, ncol = 2, categ ~ ., scales = "free_y") + scale_color_brewer(type = "qual", palette = 2) 
+draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(year = 1:length(.x$YearGyp), gyp = .x$YearGyp, gyp_depth = .x$gypDepth, module = (.x$module)))
+a = draw %>% ggplot(aes(year, gyp, color = (module))) + coord_cartesian(ylim = c()) + geom_point() + scale_y_continuous(name = "total gypsum\n[meq/100 gr soil]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "with FC module") + scale_color_brewer(type = "qual", palette = 2) + theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+b = draw %>% ggplot(aes(year, gyp_depth, color = (module)),alpha = 0.8) + coord_cartesian(ylim = c()) + geom_point() + scale_y_reverse(name = "gypsum\ndepth [cm]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "with FC module") + scale_color_brewer(type = "qual", palette = 2) + theme(legend.position =  "none")
+grid.arrange(ggarrange(a, b)) 
 
-draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(.x$WD[, 1:2], module = (.x$module))) %>% mutate(maxWD = MovingAvarage(maxWD, 100, 100))
-draw  %>% ggplot(aes(year, maxWD, color = (module))) + geom_point() +coord_cartesian(xlim =  c(50000,60000))+ scale_y_reverse(name = "annual maximad WD [cm]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "")  + scale_color_brewer(type = "qual", palette = 2)
+draw = list(test1, test2, test3, test4) %>% map_dfr(~tibble(.x$WD[, 1:2], module = (.x$module))) %>% mutate(maxWD = MovingAvarage(maxWD, 500, 500))
+draw  %>% ggplot(aes(year, maxWD, color = (module))) + geom_point() +coord_cartesian(xlim =  c())+ scale_y_reverse(name = "annual maximad WD [cm]") + xlab("duration [yr]") + guides(color = guide_legend(override.aes = list(size = 8))) + labs(color = "")  + scale_color_brewer(type = "qual", palette = 2)

@@ -68,6 +68,8 @@ dataframe = dataframe %>% filter(!str_detect(SiteName, "12|13|14|15"))
 #get a list of all the sites
 site.list = aggregate(dataframe[,] , by=list(dataframe$siteid), head,1)
 
+whrequire %>% summarise(meanCaso4 = weighted.mean(correctedMean, weight)) %>%
+    group_by(AvgAge) %>% summarise(mean(meanCaso4))
 #promote to SoilProfileCollection
 
 AQPClass = as.data.frame(dataframe);

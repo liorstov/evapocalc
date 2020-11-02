@@ -390,3 +390,5 @@ healthchecksdb
 *.jar
 *.rdata
 /test.rdataTmp
+*.RDataTmp
+/.remoterserverlog
