@@ -91,7 +91,7 @@ RectanglingResults = function(res, obs) {
     ObsMaxGyp = GetGypsicHorizonConc(obs)
 
     obs = obs %>% pull(correctedMean)
-    ObsGyp = sumGypsum(obs, 5);
+    ObsGyp = sumGypsum(obs, 5, length(obs));
     #calculate target function
     rmsdTable = res %>% map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick),
         total = sumGypsum(.x$gypsum, .x$thick), SWDp80 = .x$SWDp80, obsTop = ObsDepth$top, obsBottom = ObsDepth$bottom, ObsGyp, RMSD = rmsd(.x$gypsum, obs), biasConc = biasConc(.x$gypsum, obs, .x$thick)))) %>% rowid_to_column()
