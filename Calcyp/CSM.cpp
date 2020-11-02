@@ -244,7 +244,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 
 			if (firstDayInYear(day)) {
-				YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick)/nNumOfCompatments;
+				YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick);
 				YearCa[year] += mol2meqSoil(Compartments[CurrentComp].C_Ca, thick);;
 				YearSulfate[year] += mol2meqSoil(Compartments[CurrentComp].C_SO4, thick);
 				// get gypsum horizon of the year

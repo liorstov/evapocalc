@@ -1,8 +1,8 @@
 require(parallel)
 load("synth.RData")
-cl <- makeCluster(5, type = "PSOCK")
+cl <- makeCluster(4, type = "PSOCK")
 
-clusterExport(cl, c("T2.1", "T2.10", "T2.1", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1", "Zel2"))
+clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1"))
 
 clusterEvalQ(cl, {
     require(tidyverse)
@@ -21,7 +21,7 @@ clusterEvalQ(cl, {
     opt.WP = 0.013;
     opt.FC = 0.1;
     opt.sulfate = 10;
-    opt.dust = 3;
+    opt.dust = 6;
     seq.AETF = seq(0.8, 1.2, by = 0.4) * opt.AETF %>% rep(60);
     seq.WP = seq(0.8, 1.2, by = 0.4) * opt.WP %>% rep(60);
     seq.FC = seq(0.8, 1.2, by = 0.4) * opt.FC %>% rep(60);
@@ -34,26 +34,41 @@ clusterEvalQ(cl, {
     rainDustArray = as.matrix(crossing(RainArr, DustArr, repetition))
 })
 results = list()
-results$Terace12 = list();
-results$Qa3= list();
+results$T1.10 = list();
+results$T1.9 = list();
+results$zel11 = list();
 
 
-days = seq(20,20);
-annual = seq(30, 150, by = 20);
-PET =( seq(1000, 2300, by = 100))
-array = tibble(crossing(days, annual, PET), mean = annual / days) %>% filter(mean >= 3 & mean <= 11)
 
+days = seq(5,30, by = 5);
+annual = seq(300,400, by = 10);
+array = tibble(crossing(days, annual), mean = annual / days) %>% filter(mean >= 3 & mean <= 11)
 
-for (i in 1:length(PET)) {
+for (i in 1:nrow(array)) {
      #eilat
-    SynthRainEP = GenerateSeries(station = 347700, stationEvap = 347704,NumOfSeries = 1000, PETfactor = PET[i])
+    IMSRain = GetImsRain(station = 347700, stationEvap = 347704);
+    rainSeriesResults = GenerateSeries(NumOfSeries = 500, IMSRain = IMSRain, AnuualRain = array$annual[i], WetDays = array$days[i])
 
+    PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain, 30);
+    SynthRain = rainSeriesResults$SynthRain;
+    SynthRain$PET = PETresults$SynthPET;
+    SynthRain$K = PETresults$K;
+    PETProb = PETresults$PETProb;
+    rainProb = rainSeriesResults$DaysProb;
+    SynthRainEP = SynthRain %>% arrange(year, dayIndex);
 
     #sedom
-    SynthRainSP = GenerateSeries(station = 337000, stationEvap = 337000,NumOfSeries = 1000, PETfactor = PET[i])
+    IMSRain = GetImsRain(station = 337000, stationEvap = 337000);
+    rainSeriesResults = GenerateSeries(NumOfSeries = 500, IMSRain = IMSRain, AnuualRain = array$annual[i], WetDays = array$days[i])
 
-  
-    SynthRainEP %>% filter() %>% group_by(year) %>% summarise(s = sum(rain), n = n(), sum(PET)) %>% ungroup %>% summarise_all("mean")
+    PETresults = PETGen(rainSeriesResults$SynthRain, IMSRain, 30);
+    SynthRain = rainSeriesResults$SynthRain;
+    SynthRain$PET = PETresults$SynthPET;
+    SynthRain$K = PETresults$K;
+    PETProb = PETresults$PETProb;
+    rainProb = rainSeriesResults$DaysProb;
+    SynthRainSP = SynthRain %>% arrange(year, dayIndex);
+    SynthRainSP %>% filter(rain > 0) %>% group_by(year) %>% summarise(s = sum(rain), n = n()) %>% ungroup %>% summarise_all("mean")
 
     clusterExport(cl, "SynthRainEP")
     clusterExport(cl, "SynthRainSP")
@@ -61,33 +76,29 @@ for (i in 1:length(PET)) {
 
     #rain sens ---
 
-    results$Qa3 = c(results$Qa3, parLapply(cl, 1:30, fun = function(X) CalcGypsum(SynthRainEP,SynthRainEP, duration = 60000, Depth = 150)))
-    results$Terace12 = c(results$Terace12, parLapply(cl, 1:30, fun = function(X) CalcGypsum(SynthRainSP,SynthRainSP, duration = 60000, Depth = 150)))
-    save(results, file = "resultsListCalibRainEvapPleistocene.RData")
-
+    results$T1.9 = c(results$T1.9, parLapply(cl, 1:17, fun = function(X) CalcGypsum(SynthRainEP, duration = 11000, Depth = 150, distribution = T)))
+    results$zel11 = c(results$zel11, parLapply(cl, 1:17, fun = function(X) CalcGypsum(SynthRainSP, duration = 10300, Depth = 150, distribution = T)))
 }
 
+save(results, file = "resultsListCalibRain.RData")
 
 resultsTable = bind_rows(
-   RMSD.T.10 = RectanglingResults(results$Qa3, T1.10) %>% mutate(profile = "T1.10", isHolocene = T),
-    RMSD.Zel11 = RectanglingResults(results$Terace12, Zel11) %>% mutate(profile = "zel11", isHolocene = T),
+   RMSD.T.10 = RectanglingResults(results$T1.10 , c(T1.10Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.10", isHolocene = T),
+    RMSD.Zel11 = RectanglingResults(results$zel11 , c(Zel11Observed %>% pull(correctedMean))) %>% mutate(profile = "zel11", isHolocene = T),
 #RMSD.T1.1 = RectanglingResults(results$T1.1, c(T1.1Observed %>% pull(correctedMean))) %>% mutate(profile = "T1.1", isHolocene = F),
 #RMSD.T2.1 = RectanglingResults(results$T2.1, c(T2.1 %>% pull(correctedMean))) %>% mutate(profile = "T2.1", isHolocene = F),
 #RMSD.zel1 = RectanglingResults(results$zel1, c(Zel1 %>% pull(correctedMean))) %>% mutate(profile = "zel1", isHolocene = F)
 )
 resultsTable = resultsTable %>% mutate(optimal = ifelse(FC == opt.FC & AETF == opt.AETF & sulfate == opt.sulfate & dustFlux == opt.dust & WP == opt.WP, T, F)) %>%
-    mutate(region = ifelse(profile %in% c("zel11", "zel1"), "Zeelim", "Shehoret"))
+    mutate(region = ifelse(profile %in% c("zel11", "zel1"), "zeelim", "shehoret"))
+
 
 ## sens test for weather series---
 #%>% group_by(scale = round(scale,1), shape = round(shape,1), region)%>% summarise_if(is.numeric,median) 
-sensTest = resultsTable %>% filter(duration == 60000) %>% mutate(meanDay = (AnnualRain / rainDays), Gypsum_depth = PeakDepth, Total_concentration = total) %>%
-    gather("target", "value", Gypsum_depth, Total_concentration)
+sensTest = resultsTable  %>% mutate(meanDay = (AnnualRain / rainDays), Gypsum_depth = PeakDepth, Max_Concentration = PeakConc, Total_concentration = total) %>%
+    gather("target", "value", Gypsum_depth, Max_Concentration, Total_concentration)
 
-sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = PET, y = value, color = factor(duration), group = (PET %/% 300 * 300))) + geom_boxplot() + geom_point(shape = 1, size = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c(150, 0)) + scale_y_reverse(name = "Depth [cm]") + xlab("Annual PET [mm]") + labs(color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
-a = sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot(outlier.color = NA) + stat_summary(geom = "point",fun = "mean", shape = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c()) + scale_y_reverse(name = "Depth [cm]") + xlab("Annual PET [mm]") + labs(color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
-sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot() + facet_wrap(~region) + labs() + coord_cartesian(xlim = c()) + labs(y = "mean gypsum conc. [meq/100 gr soil]", x = "Annual PET [mm]", color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
-b = sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot(outlier.color = NA) + stat_summary(geom = "point", fun = "mean", shape = 5) + facet_wrap(~region) + labs() + coord_cartesian(xlim = c()) + labs(y = "mean gypsum conc. [meq/100 gr soil]", x = "Annual PET [mm]", color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
-arrangeGrob(a,b)
-grid.arrange(arrangeGrob(a, b))
+sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = rainDays, size = AnnualRain/rainDays)) + geom_point(shape = 1) + facet_wrap(target ~ region, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs() + coord_cartesian(xlim = c()) + scale_y_reverse()
+sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = rainDays, size = AnnualRain / rainDays)) + geom_point(shape = 1) + facet_wrap(target ~ region, scales = "free_y") + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs() + coord_cartesian(xlim = c())
 #---
 

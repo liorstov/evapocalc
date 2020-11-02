@@ -18,7 +18,7 @@ clusterEvalQ(cl, {
     opt.AETF = 1.2;
     opt.WP = 0.013;
     opt.FC = 0.1;
-    opt.sulfate = 13;
+    opt.sulfate = 10;
     opt.dust = 6;
     seq.AETF = seq(0.8, 1.2, by = 0.4) * opt.AETF %>% rep(60);
     seq.WP = seq(0.8, 1.2, by = 0.4) * opt.WP %>% rep(60);
@@ -91,26 +91,28 @@ resultsTable$refPeakDepth = resultsTable$PeakDepth %>% lead(1)
 resultsTable$reftotal = resultsTable$total %>% lead(1)
 
 #erase ref computation
-senstest = resultsTable %>% filter(rowid %% 2 != 0)
+resultsTable = resultsTable %>% filter(rowid %% 2 != 0)
 
 #relative values from ref
-senstest = senstest %>% mutate(Gypsum_depth = (PeakDepth - refPeakDepth) / refPeakDepth, Total_concentration = (total - reftotal) / reftotal, WHC = FC - WP);
+resultsTable = resultsTable %>% mutate(Max_Concentration = (PeakConc - refPeakConc) / refPeakConc,
+                    Gypsum_depth = (PeakDepth - refPeakDepth) / refPeakDepth,
+                       Total_concentration = (total - reftotal) / reftotal, WHC = FC - WP);
 
 #build tibble with values for each parameter and calculate the normelise factor
 senstest = bind_rows(
-   # WHCSens = senstest %>% filter(AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "WHC", change = WHC / opt.WHC, normal = opt.WHC / (WHC - opt.WHC)),
-   # WPSens = senstest %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r - residual\nwater content", change = WP / opt.WP, normal = opt.WP / (WP - opt.WP)),
-    FCSens = senstest %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, FC %in% seq.FC) %>% mutate(param = "Field Capacity", change = FC / opt.FC, normal = opt.FC / (FC - opt.FC)),
-    AETFSens = senstest %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF) %>% mutate(param = "AET Factor", change = AETF / opt.AETF, normal = opt.AETF / (AETF - opt.AETF)),
-    sulfateSens = senstest %>% filter(FC == opt.FC, AETF == opt.AETF, WP == opt.WP, dustFlux == opt.dust, sulfate %in% seq.rainSeq) %>% mutate(param = "Sulfate", change = sulfate / opt.sulfate, normal = opt.sulfate / (sulfate - opt.sulfate)),
-    dustFSens = senstest %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq) %>% mutate(param = "Annual dust flux", change = dustFlux / opt.dust, normal = opt.dust / (dustFlux - opt.dust))
+    WHCSens = resultsTable %>% filter( AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP, FC %in% seq.FC) %>% mutate(param = "WHC", change = WHC / opt.WHC, normal = opt.WHC / (WHC - opt.WHC)),
+   # WPSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, dustFlux == opt.dust, WP %in% seq.WP) %>% mutate(param = "\u03B8r", change = WP / opt.WP, normal = opt.WP / (WP - opt.WP)),
+  #  FCSens = resultsTable %>% filter(WP == opt.WP, AETF == opt.AETF, sulfate == opt.sulfate, FC %in% seq.FC) %>% mutate(param = "FC", change = FC / opt.FC, normal = opt.FC / (FC - opt.FC)),
+    AETFSens = resultsTable %>% filter(FC == opt.FC, WP == opt.WP, sulfate == opt.sulfate, dustFlux == opt.dust, AETF %in% seq.AETF) %>% mutate(param = "AET.F", change = AETF / opt.AETF, normal = opt.AETF / (AETF - opt.AETF)),
+    sulfateSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, WP == opt.WP, dustFlux == opt.dust, sulfate %in% seq.rainSeq) %>% mutate(param = "sulfate", change = sulfate / opt.sulfate, normal = opt.sulfate / (sulfate - opt.sulfate)),
+    dustFSens = resultsTable %>% filter(FC == opt.FC, AETF == opt.AETF, sulfate == opt.sulfate, WP == opt.WP, dustFlux %in% seq.dustSeq) %>% mutate(param = "dustFlux", change = dustFlux / opt.dust, normal = opt.dust / (dustFlux - opt.dust))
     )
 
 #calculate with normalisation factor
-senstest = senstest %>% mutate(normal = abs(normal), Gypsum_depth = Gypsum_depth * normal, Total_concentration = Total_concentration * normal) %>% drop_na()
+senstest = senstest %>% mutate(normal = abs(normal), Max_Concentration = Max_Concentration * normal, Gypsum_depth = Gypsum_depth * normal, Total_concentration = Total_concentration * normal) %>% drop_na()
 
-#senstest$param = factor(senstest$param, levels = c("\u03B8r", "FC", "WHC", "AET.F", "dustFlux", "sulfate"))
+senstest$param = factor(senstest$param, levels = c("\u03B8r", "FC", "WHC", "AET.F", "dustFlux", "sulfate"))
 #plot
-senstest %>% dplyr::select(change,  Gypsum_depth, Total_concentration, Parameter = param,rowid,region) %>% gather("target", "value", - Parameter, - change,-rowid,-region) %>%
-    ggplot(aes(y = value, x = factor(change), color = Parameter)) + facet_wrap(target ~ ., nrow = 1) + geom_boxplot(outlier.shape = NA,fill = "gray90") + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_hline(aes(yintercept = 0), linetype = "longdash") +
-    scale_y_continuous(name = "Rel sensitivity [-]") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "Parameter", x = "Change from reference")  + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%")) + coord_cartesian(ylim = c(-5,10))
+senstest %>% dplyr::select(change, Max_Concentration, Gypsum_depth, Total_concentration, Parameter = param,rowid,region) %>% gather("target", "value", - Parameter, - change,-rowid,-region) %>%
+    ggplot(aes(y = value, x = factor(change), color = Parameter)) + facet_wrap(target ~ ., nrow = 1) + geom_boxplot(outlier.shape = NA,fill = "gray90") + stat_boxplot(geom = 'errorbar', linetype = 1, width = 0.5, position = position_dodge(0.75)) + geom_point(aes(color = Parameter),stat = "summary", fun = "mean", shape = 5, size = 2, position = position_dodge(0.75)) + geom_hline(aes(yintercept = 0), linetype = "longdash") +
+    scale_y_continuous(name = "Rel sensitivity [-]") + theme(strip.text = element_text(size = 30), legend.text = element_text(size = 30), legend.title = element_text(size = 35)) + labs(color = "Parameter", x = "change from optimal")  + scale_x_discrete(labels = function(x) paste0(as.numeric(x) * 100, "%"))

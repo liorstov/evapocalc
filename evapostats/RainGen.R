@@ -97,8 +97,8 @@ GetImsRain = function(station = 347700 ,stationEvap = 347704) {
     #stationElatEvap = 347704;
     #stationSedom = 337000;
     con = odbcConnect("RainEvap")
-    IMSRain = as_tibble(sqlQuery(con, paste("SELECT *, idstation as station, year(time) as year,month(time) as month, measure as rain FROM data_dream.precip_daily where ((precip_daily.idstation = ",station,"))")));
-    EvapSeries = as_tibble(sqlQuery(con, paste("SELECT *, measure as pen, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex FROM data_dream.pet_daily where idstation = ", stationEvap, " and isnull(measure) = 0")));
+    IMSRain = tbl_df(sqlQuery(con, paste("SELECT *, idstation as station, year(time) as year,month(time) as month, measure as rain FROM data_dream.precip_daily where ((precip_daily.idstation = ",station,"))")));
+    EvapSeries = tbl_df(sqlQuery(con, paste("SELECT *, measure as pen, year(time) as year,month(time) as month ,dayofyear(time) as dayIndex FROM data_dream.pet_daily where idstation = ", stationEvap, " and isnull(measure) = 0")));
     RODBC::odbcCloseAll();
 
     #expend to get full year representation
@@ -425,7 +425,4 @@ GenerateSeries = function(station = 347700, stationEvap = 347704, NumOfSeries = 
     rainProb = rainSeriesResults$DaysProb;
     SynthRain = SynthRain %>% arrange(year, dayIndex) %>% dplyr::select(year,rain ,PET);
     return(SynthRain)
-}
-getPETfactor = function(station = 347700, wantedPET) {
-    return(ifelse(station == 347700, wantedPET * 0.0005, wantedPET * 0.0004))
 }
