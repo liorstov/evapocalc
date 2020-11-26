@@ -80,14 +80,17 @@ resultsTable = resultsTable %>% mutate(optimal = ifelse(FC == opt.FC & AETF == o
 
 ## sens test for weather series---
 #%>% group_by(scale = round(scale,1), shape = round(shape,1), region)%>% summarise_if(is.numeric,median) 
-sensTest = resultsTable %>% filter(duration == 60000) %>% mutate(meanDay = (AnnualRain / rainDays), Gypsum_depth = PeakDepth, Total_concentration = total) %>%
+sensTest = resultsTable %>% filter(AnnualRain <=100) %>% mutate(meanDay = (AnnualRain / rainDays), Gypsum_depth = PeakDepth, Total_concentration = total) %>%
     gather("target", "value", Gypsum_depth, Total_concentration)
 
-sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = PET, y = value, color = factor(duration), group = (PET %/% 300 * 300))) + geom_boxplot() + geom_point(shape = 1, size = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c(150, 0)) + scale_y_reverse(name = "Depth [cm]") + xlab("Annual PET [mm]") + labs(color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
+a = sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = rainDays)) + geom_point(shape = 1, size = 5, show.legend = T) +facet_wrap(. ~ paste(region, ": ", duration, " years")) + labs() + coord_cartesian(xlim = c()) + labs(y = "gypsum conc.\n [meq/100 gr soil]", x = "Annual PET [mm]", color = "# rain days", size = "Rain event depth [mm]") + scale_color_distiller(palette = "PuBuGn", direction = 1) + theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+b = sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = rainDays)) + geom_point(shape = 1, size = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c()) + scale_y_reverse(name = "Depth [cm]") + xlab("Mean annual rainfall [mm]") + labs(size = "# rain days", color = "Rain event depth [mm]") + scale_color_distiller(palette = "PuBuGn", direction = 1) + theme(legend.position = "none",, strip.text = element_blank())
+ggarrange(a,b,ncol =1)
+sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = AnnualRain, y = value, color = factor(duration), group = (PET %/% 300 * 300))) + geom_boxplot() + geom_point(shape = 1, size = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c(150, 0)) + scale_y_reverse(name = "Depth [cm]") + xlab("Annual PET [mm]") + labs(color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
 a = sensTest %>% filter(target == "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot(outlier.color = NA) + stat_summary(geom = "point",fun = "mean", shape = 5) + facet_wrap(~region) + labs() + coord_cartesian(ylim = c()) + scale_y_reverse(name = "Depth [cm]") + xlab("Annual PET [mm]") + labs(color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
 sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot() + facet_wrap(~region) + labs() + coord_cartesian(xlim = c()) + labs(y = "mean gypsum conc. [meq/100 gr soil]", x = "Annual PET [mm]", color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
 b = sensTest %>% filter(target != "Gypsum_depth") %>% ggplot(aes(x = factor(PET %/% 300 * 300), y = value)) + geom_boxplot(outlier.color = NA) + stat_summary(geom = "point", fun = "mean", shape = 5) + facet_wrap(~region) + labs() + coord_cartesian(xlim = c()) + labs(y = "mean gypsum conc. [meq/100 gr soil]", x = "Annual PET [mm]", color = "# rain days", size = "Rain event depth [mm]") # + scale_color_gradientn(colours = rainbow(5, rev = T))
 arrangeGrob(a,b)
 grid.arrange(arrangeGrob(a, b))
 #---
-
+grid.arrange

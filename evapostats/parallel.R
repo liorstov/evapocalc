@@ -5,31 +5,35 @@ cl <- makeCluster(4, type = "PSOCK")
 clusterExport(cl, c("Zel11Observed", "T1.9Observed", "T1.10Observed", "T2.1", "T1.1Observed", "opt.AETF", "opt.dust", "opt.FC", "opt.sulfate", "opt.WP", "Zel1"))
 
 clusterEvalQ(cl, {
-    require(tidyverse)
-    require(Rcpp)
-    require(ggplot2)
-    require(reshape2)
-    require(zoo)
+   require(tidyverse)
+   require(Rcpp)
+   require(ggplot2)
+   require(reshape2)
+   require(zoo)
+   require(fitdistrplus)
+
     require(tictoc)
-    Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
-    b <<- new(CSMCLASS);
-    source("C:/Users/liorst/source/repos/evapocalc/evapostats/Functions.R", encoding = "Windows-1252")
+   Rcpp::sourceCpp('C:/Users/liorst/source/repos/evapocalc/Calcyp/CSM.cpp', verbose = TRUE, rebuild = 0);
+   cppModule <- new(CSMCLASS);
+   source("C:/Users/liorst/source/repos/evapocalc/evapostats/Functions.R", encoding = "Windows-1252")
+
 
     opt.AETF = 1.2;
-    opt.WP = 0.013;
-    opt.FC = 0.1;
-    opt.sulfate = 13;
-    opt.dust = 6;
-    seq.AETF = seq(0.8, 1.2, by = 0.4) * opt.AETF %>% rep(60);
-    seq.WP = seq(0.8, 1.2, by = 0.4) * opt.WP %>% rep(60);
-    seq.FC = seq(0.8, 1.2, by = 0.4) * opt.FC %>% rep(60);
-    seq.rainSeq = seq(0.8, 1.2, by = 0.4) * opt.sulfate %>% rep(60);
-    seq.dustSeq = seq(0.8, 1.2, by = 0.4) * opt.dust %>% rep(60);
+   opt.WP = 0.013;
+   opt.FC = 0.1;
+   opt.sulfate = 10;
+   opt.dust = 6;
+   seq.AETF = seq(0.8, 1.2, by = 0.4) * opt.AETF %>% rep(60);
+   seq.WP = seq(0.8, 1.2, by = 0.4) * opt.WP %>% rep(60);
+   seq.FC = seq(0.8, 1.2, by = 0.4) * opt.FC %>% rep(60);
+   seq.rainSeq = seq(0.8, 1.2, by = 0.4) * opt.sulfate %>% rep(60);
+   seq.dustSeq = seq(0.8, 1.2, by = 0.4) * opt.dust %>% rep(60);
+
 
         RainArr = seq(10, 20, by = 1);
     DustArr = c(seq(1, 26, by = 5));
-    repetition = 1:5
-    rainDustArray = as.matrix(crossing(RainArr, DustArr, repetition))
+    repetition = 1:10
+    rainDustArray = tibble(crossing(RainArr, DustArr, repetition))
 })
 results = list()
 results$T1.10 = list();
@@ -44,6 +48,9 @@ tic()
 days = seq(5, 20, by = 5);
 annual =  seq(150, 200, by = 15);
 array = tibble(crossing(days, annual),mean = annual/days) %>% filter(mean>=3 & mean <= 11)
+
+
+resRate = parLapply(cl, 1:nrow(rainDustArray), fun = function(X) CalcGypsum(SynthRainE, duration = 13400, Depth = 150,, rainSO4 = 0, dustFlux = rainDustArray$DustArr[X], rainstat = T, withRunoff = F, withFC = F))
 
 for (i in 1:nrow(array)) {
     # eilat

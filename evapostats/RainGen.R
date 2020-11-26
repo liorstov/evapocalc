@@ -140,10 +140,10 @@ GenerateRainSeries = function(NumOfSeries = 1000, IMSRain, AnuualRain = 0, WetDa
     if (AnuualRain != 0 & WetDays != 0) {
         if (stationName == "Eilat") {
             AltWB = AlternativeWeibullE(AnuualRain / WetDays);
-            factor = 4.743 * WetDays ^ -0.711
+            factor = 7.5016 * WetDays ^ -0.892
         } else {
             AltWB = AlternativeWeibullS(AnuualRain / WetDays);
-            factor = 5.057 * WetDays ^ -0.596
+            factor = 8.7281 * WetDays ^ -0.746
 
         }
         shape = AltWB$shape;

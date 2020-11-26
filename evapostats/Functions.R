@@ -1,6 +1,6 @@
 CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, duration, Depth = 150, thick = 5, wieltingPoint = opt.WP,
                          nArea = 1, FieldCapacity = opt.FC, DustGyp = 0.005, AETFactor = opt.AETF,
-                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T, distribution = F, rainstat = F,withRunoff = T,withFC = T,PETFactor=1) {
+                        verbose = FALSE, rainCa = 35.58, dustFlux = opt.dust, rainSO4 = opt.sulfate, getWD = F, random = T, distribution = F, rainstat = F,withRunoff = T,withFC = T,PETFactor=1,WRain=0,Wdays=0,Wpet = 0) {
 
 
     regionEilat = !as.logical(rainHolocene %>% pull(year) %>% tail(1) %% 70)
@@ -82,6 +82,9 @@ CalcGypsum <- function(rainHolocene = SynthRainE, rainPleistocene = NULL, durati
         list$gypDepth = NULL
     }
     tic()
+    list$Wpet = Wpet;
+    list$Wdays = Wdays;
+    list$WRain = WRain;
     list$max = mean(rainStat$max, na.rm = T)
     list$sd = mean(rainStat$sd, na.rm = T)
     list$rainDays = mean(rainStat$n, na.rm = T);
@@ -147,12 +150,15 @@ RectanglingResults = function(res, obs) {
     ObsBottom = length(obs)
 
     obs = obs %>% pull(correctedMean)
-    ObsGyp = sumGypsum(obs, 5,ObsBottom);
+    ObsGyp = sumGypsum(obs, 5, ObsBottom);
     #calculate target function
-    rmsdTable = res %>% map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick),
+    plan(multisession, workers = 3)
+    rmsdTable = res %>% furrr::future_map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick),
         total = sumGypsum(.x$gypsum, .x$thick, ObsBottom), SWDp80 = .x$SWDp80, obsTop = ObsDepth$top, obsBottom = ObsDepth$bottom, ObsGyp ,PET = .x$PET,AET = .x$AET))) %>% rowid_to_column()
+    #rmsdTable = res %>% furrr::future_map_dfr(.f = ~(tibble(duration = .x$duration, AnnualRain = .x$AnnualRain, rainDays = .x$rainDays, sulfate = .x$RSO4, WP = .x$WP, FC = .x$FC, AETF = .x$AETF, dustFlux = .x$DF, PeakConc = max(.x$gypsum), PeakDepth = comp2Depth(which.max(.x$gypsum), .x$thick),
+        #total = sumGypsum(.x$gypsum, .x$thick, ObsBottom), SWDp80 = .x$SWDp80, obsTop = ObsDepth$top, obsBottom = ObsDepth$bottom, ObsGyp ,PET = .x$PET,AET = .x$AET,WRain = .x$WRain, Wdays  = .x$Wdays, Wpet = .x$Wpet))) %>% rowid_to_column()
     return(rmsdTable)
-
+    
 }
 
 GetRandomValue <- function(X) {
@@ -476,18 +482,21 @@ interpulate = function(x, y, z, n = 40) {
     return(d2)
 }
 plotRate = function(res) {
-    res = RateTest %>% map_df(.f = ~tibble(rain = .x$YearlyRain, RainDays = .x$RainDays, meanYear = .x$meanYear, RMSD = .x$RMSD, DFlux = .x$DF, RSO4 = .x$RSO4, gyp = .x$YearGyp, dustSulfate = .x$YearDust * 96.06, Rainsulfate = .x$YearSulfate * 96.06, gypsub = gyp, totSulfate = dustSulfate + Rainsulfate)) %>% drop_na() %>% filter(rain < 100 & rain > 0)
-    ggplot(res, aes(dustSulfate * 1000, rain, color = gypsub, z = gypsub)) + geom_point(size = 1, alpha = 1) + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "sulfate [mg/yr]", y = "yearly rain [mm]", color = "Gypsum \naccumulation rate \n [meq/100gr soil /yr]")
+    resRate1 = lapply(seq(1), FUN = function(x) CalcGypsum(SynthRainE, duration = 10000, Depth = 100,, rainSO4 = 10, dustFlux =50, rainstat = T, withRunoff = F, withFC = F))
 
+    resrate = c(resRate,resRate1)
+    res = resRate1 %>% map_df(.f = ~tibble(rain = .x$rainStat$annual, RainDays = .x$rainStat$n, DFlux = .x$DF * .x$DGyp / 10000 * 0.7, RSO4 = .x$RSO4, gyp = .x$YearGyp * 20, Rainsulfate = .x$YearSulfate * 1.44 * 5 / 100 * 0.5 * 96.06, gypsub = gyp - lag(gyp), totSulfate = Rainsulfate + DFlux)) %>% drop_na() %>% filter(rain < 100 & rain > 0)
+    res = res %>% group_by(material) %>% slice_tail(n = 100)
+    ggplot(res %>% filter(gypsub > 0), aes(totSulfate, rain, color = gypsub, z = gypsub)) + geom_point(size = 1, alpha = 1) + scale_color_gradientn(colours = rainbow(5, rev = T)) + labs(x = "sulfate [mg/yr]", y = "yearly rain [mm]", color = "Gypsum \naccumulation rate \n [meq/100gr soil /yr]") + coord_cartesian(ylim = c())
 
-    bla = interp(res$ra, res$dustSulfate * 1000, res$gypsub, duplicate = "median", ny = 60, nx = 60)
+    bla = interp(res$rain, res$totSulfate, res$gypsub, duplicate = "median", ny = 60, nx = 60)
     d2 <- as_tibble(melt(bla$z, na.rm = T))
     names(d2) <- c("rain", "totSulfate", "gypsub")
 
     d2$rain <- bla$x[d2$rain]
     d2$totSulfate <- bla$y[d2$totSulfate]
     ggplot(d2, aes(totSulfate, rain, fill = gypsub, z = gypsub, color = gypsub)) + geom_raster() + geom_contour(color = "black") + scale_fill_gradientn(colours = rainbow(5, rev = T)) + scale_color_gradientn(colours = rainbow(5, rev = T)) +
-        labs(x = "sulfate from dust[mg/yr]", y = "annual standard deviation [mm]", fill = "Gypsum \naccumulation rate \n [meq/100gr soil /yr]") +
+        labs(x = "sulfate from dust[mg/yr]", y = "annual standard deviation [mm]", fill = "Gypsum \naccumulation rate \n [meq/100gr soil /yr]") 
         geom_point(aes(x = 0.004, y = 30, shape = "T1.10 - 0.0025", fill = 3000), size = 5, color = "white", stroke = 3) +
         geom_point(aes(x = 0.01, y = 30, shape = "T1.9 - 0.0016"), color = "white", size = 5) +
         geom_point(aes(x = 0.018, y = 27, shape = "zel11 - 0.0018"), color = "white", size = 5) +

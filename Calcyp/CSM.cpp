@@ -52,6 +52,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	double DailyCaRain;
 	double inputCa = 0;
 	double outputCa = 0;
+	double GypAgg = 0;
 	int year = 0;
 	int nWDComp = 0;
 	int nRainEvents = 0;
@@ -170,7 +171,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			Compartments[0].C_Ca +=  DailyCaRain;
 			Compartments[0].C_SO4 += DailySO4Rain;
 			Compartments[0].C_CaSO4 += accumolateDustDays * nDailyDustGyp;
-			
+			YearSulfate[year] += DailySO4Rain;
+
 			accumolateDustDays = 0;
 		}
 		else
@@ -233,7 +235,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			// only if moist change since yesterday
 			if (Compartments[CurrentComp].nMoist != Compartments[CurrentComp].nLastMoist) {
 				Compartments[CurrentComp].nLastMoist = Compartments[CurrentComp].nMoist;
-				Compartments[CurrentComp].solubility(nTemp);	
+				GypAgg = Compartments[CurrentComp].solubility(nTemp);
+				YearGyp[year] += mol2meqSoil(GypAgg, thick);
+
 			}										
 			
 
@@ -244,9 +248,9 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 
 			if (firstDayInYear(day)) {
-				YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick)/nNumOfCompatments;
+				//YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick)/nNumOfCompatments;
 				YearCa[year] += mol2meqSoil(Compartments[CurrentComp].C_Ca, thick);;
-				YearSulfate[year] += mol2meqSoil(Compartments[CurrentComp].C_SO4, thick);
+				//YearSulfate[year] += mol2meqSoil(Compartments[CurrentComp].C_SO4, thick);
 				// get gypsum horizon of the year
 				if (Compartments[CurrentComp].C_CaSO4 > YearMaxGyp[year])
 				{

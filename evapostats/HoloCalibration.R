@@ -29,7 +29,7 @@ clusterEvalQ(cl, {
     seq.dustSeq = seq(0.8, 1.2, by = 0.4) * opt.dust %>% rep(60);
 
     RainArr = seq(10, 30, by = 5);
-    DustArr = c(seq(1, 31, by = 15));
+    DustArr = 10;
     AetFactorArr = c(seq(0.6, 1.4, by = 0.4));
     repetition = 1:1;
     rainDustArray = as.matrix(crossing(RainArr, DustArr, AetFactorArr, repetition));

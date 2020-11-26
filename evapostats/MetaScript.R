@@ -37,8 +37,8 @@ theme_set(theme_classic() + theme(legend.key.size = unit(1, "line"), legend.text
 axis.text.x = element_text(size = 28, angle = 43, hjust = 1), title = element_text(size = 20),
 strip.text = element_text( size = 20),
 axis.text.y = element_text(size = 28),
-axis.title.y = element_text(size = 35,margin = margin(t = 0, r = 10, b = 0, l = 0)), axis.text.y.right = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
-axis.title.x = element_text(size = 35),
+axis.title.y = element_text(size = 30,margin = margin(t = 0, r = 10, b = 0, l = 0)), axis.text.y.right = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)),
+axis.title.x = element_text(size = 30),
 legend.key.height = unit(3, "line"),
 panel.grid.major = element_line(colour = "grey93"),
 panel.grid.minor = element_line(colour = "grey93"),
@@ -62,24 +62,24 @@ cppModule <- new(CSMCLASS);
 #stationElatEvap = 347704;
 #stationSedom = 337000;
 factor = tibble(key = numeric(), value = numeric())
-for (item in seq(0.1,1,by = 0.1)) {
-    test = GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 60, PETfactor = item)
-    value = test %>% group_by(year) %>% summarise_all(sum) %>% summarise_all(mean) %>% pull(PET)
+for (item in seq(0,3,by = 0.05)) {
+    test = GenerateRainSeries( NumOfSeries = 500,IMSRain, lol = item)
+    value = test$SynthRain%>%filter(rain>0)%>% group_by(year) %>% summarise(n=n()) %>% summarise_all(mean) %>% pull(n)
     factor = factor %>% add_row(key = item, value = value)
 }
 factorS = tibble(key = numeric(), value = numeric())
 for (item in seq(0.1, 1, by = 0.1)) {
-    test = GenerateSeries(station = 337000, stationEvap = 337000, PETfactor = 1, NumOfSeries = 60)
+    test = GenerateRainSeries(station = 337000, stationEvap = 337000, PETfactor = 1, NumOfSeries = 60)
     value = test %>% group_by(year) %>% summarise_all(sum) %>% summarise_all(mean) %>% pull(PET)
     factorS = factorS %>% add_row(key = item, value = value)
 }
 
 
-SynthRainEP= GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 1000,  AnuualRain = 70, WetDays = 15)
-IMSRain = GetImsRain(station = 337000, stationEvap = 337000)
+SynthRainEP = GenerateSeries(station = 347700, stationEvap = 347704, NumOfSeries = 500, AnuualRain = 48, WetDays = 16)
+IMSRain = GetImsRain(station = 347700, stationEvap = 347704)
 results = plotResults(SynthRain, IMSRain, rainSeriesResults$DaysProb, PETresults$PETProb, 1);
-
-IMSRain %>% filter(rain > 0) %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n(),PET = sum(pen)) %>% drop_na() %>% summarise(mean(n), mean(s), mean(PET,na.rm = T))
+SynthRainEP %>% group_by(year)%>% filter(rain > 0.1) %>% summarise(a = sum(rain), n=n()) %>% summarise(mean(a), mean(n))
+IMSRain  %>% group_by(waterYear) %>% summarise(s = sum(rain), n = n(),PET = sum(pen)) %>% drop_na() %>% summarise(mean(n), mean(s), mean(PET,na.rm = T))
 
 result = CalcGypsum(SynthRainE, SynthRainEP, duration = 60000, Depth = 150, rainstat = F, random = T, withRunoff = T, withFC = T,rainSO4 = 13)
 plotSoilResults(results[[1]], T1.1,T)
