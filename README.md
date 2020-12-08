@@ -14,6 +14,22 @@ Calgyp is a model designed to calculate the the concentration and dispersion of 
 	 This section is responsible for creating a daily rainfall series of costume length which represents the statistical climate properties in a selected meteorological station.  
 	 *evapostats\RainGen.R*: Is responsible for getting the meteorological data from the IMS using *GetImsRain()* and generate the wet and dry days probabilities using markov chain algorithm    in *CalculateProbabilities()*. The *GenerateRainSeries(numOfSeries)* function generates the costume length series.
 	 
+	 this code creates daily rain from a weibull distribution:
+	 
+		#create matrix with weibull values for depth
+		weibull = matrix(rweibull(365 * numOfyears, shape, scale) + DepthLimit, nrow = numOfyears, ncol = 365);
+
+		#matrix with random values 
+		randMat = matrix(runif(365 * numOfyears)*factor, nrow = numOfyears, ncol = 365);
+		SynthRain = matrix(0, nrow = numOfyears, ncol = 365, dimnames = list(1:numOfyears, 1:365))
+
+		for (days in 2:ncol(SynthRain)) {
+		SynthRain[, days] = as.numeric((SynthRain[, days - 1] & (randMat[, days] < DaysProb$PWAW[days])) | (!SynthRain[, days - 1] & (randMat[, days] < 				DaysProb$PWAD[days])));
+		}
+
+		#addd amounts
+		SynthRain[which(SynthRain == 1)] = weibull[which(SynthRain == 1)];
+
 WG results for Eilat station  
 ![](plots/EilatWG.png)  
 
@@ -21,6 +37,7 @@ WG results for Eilat station
 	A c++ model which simulate a soil column divided into compartments of a specified thickness.   Every iteration represents a daily routine of moisture addition and evaporation according to the daily rain ane potential evaporation supplied by the weather generator. The model is located in the *Calcyp* directory
 	 - CSM.cpp - The main function is  *CSM::Calculate()* responsible for calculating the daily water balance. Distribute the moisture between the compartments represent the soil profile. 
 	 - Compartment.cpp - represent a compartment object. The properties of the compartment are soil parameters, moisture, and gypsum concentration. *solubility()* calculates the equilibrium and return the accumulated gypsum
+	 
 	 
 ![](plots/oper.png) 
 
