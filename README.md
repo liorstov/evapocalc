@@ -4,7 +4,7 @@ Calgyp is a model designed to calculate the the concentration and dispersion of 
   
   
 
-> gypsum accumulation in a soil profile with time. 
+> gypsum accumulation in a soil profile with time as a response to daily rain and evaporation values supplied by the weather generator. 
 
 ![asd](https://media.giphy.com/media/BGrb9vc3Eb7t9A0hug/giphy.gif)
  
