@@ -4,16 +4,14 @@
 #include <map>
 #include <Rcpp.h>
 
-
+// each compartment represent 5 cm of soil. Packed together vertically
 using namespace std;
 class Compartment
 {
 public:
-	Compartment(int , int, double, double, int , double, double);
-	
-	~Compartment();
-	
-	double solubility(double temp);
+	Compartment(int , int, double, double, int , double, double);	
+	~Compartment();	
+	double solubility(double temp);//chemical model
 	pair<double, double> quadricEquation(double, double, double);
 	void setAllToZero();
 	double GetIOnsSum();

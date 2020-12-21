@@ -16,7 +16,6 @@ using namespace Rcpp;
 using namespace std;
 
 
-typedef enum { WINTER, SPRING, SUMMER } SEASON;
 
 
 class CSM
@@ -24,7 +23,7 @@ class CSM
 public:
 	CSM();
 	Rcpp::List Calculate(Rcpp::DoubleVector, Rcpp::DoubleVector, int years, int Depth, int nthick,
- double WieltingPoint,int FieldArea, double FieldCapacity, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4,bool withFC);
+	double WieltingPoint,int FieldArea, double FieldCapacity, double DustSO4, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4,bool withFC);
 	std::vector<Compartment>* GetCompartments();
 	Rcpp::NumericMatrix output2Matrix(Rcpp::DoubleVector & inputVector, bool verbose);
 	double meqSoil2molar(double, double,double);
@@ -82,7 +81,7 @@ public:
 
 	}
 
-
+	// vector of soil profile compartments
 	std::vector<Compartment> Compartments;
 	Rcpp::NumericVector RainArr;
 	float AET;

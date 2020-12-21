@@ -1,6 +1,6 @@
 ﻿#include "Compartment.h"
 
-
+// init compartment with data from CSM
 Compartment::Compartment(int Index, int area, double wieldingpoint, double fieldcapacity, int thick , double CCa0, double CSO4)
 {
 	this->fDepth = (Index +0.5)*thick;
@@ -23,9 +23,6 @@ Compartment::Compartment(int Index, int area, double wieldingpoint, double field
 Compartment::~Compartment()
 {
 }
-
-
-
 
 // solubility is a function that calculates the mass - caco3 [g] of CaCO3 and concentration of Ca in solution - cca [mol/L] or [M] in a compartment given the temprature - temp [deg]
 // partial pressure of CO2 - pco2 [atm], intial concentration of Ca in solution - cca [mol/L] or [M], current soil moisture - moist [cm], previous soil moisture content - moisti [cm]
@@ -95,9 +92,11 @@ double Compartment::solubility(double temp)
 
 	//printf_s("Percipitation: omegaga is %f    gypsum is: %f \n", GypOmega, MCaSO4 * MoistInLitre);
 
+	// return with Subtraction or addition
 	return (alphaGypsum < 0 ? -alphaGypsum : 0);
 }
 
+// solce quadric equation 
 pair<double, double> Compartment::quadricEquation(double a, double b , double c)
 {
 	pair<double, double> solutions (0,0);

@@ -30,6 +30,7 @@ CSM::CSM()
 	printf("csm Const\n");
 }
 
+//Main function of the model. called by the R wrapper
 //flux is gram/cm2/day
 //dust concentration is mg/gram; rain concentration is mg/l
 Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint,
@@ -68,9 +69,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	nTotalAet = 0;
 	nTotalWP = 0;
 	accumolateDustDays = 0.0F;
-
 	nLeachate = 0;
-
 	nNumOfDays= years*365;
 	nDepth = Depth;
 	thick = nthick;	
@@ -93,7 +92,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	
 	
 
-	// create list with all compartment
+	// create list with all compartment for R analysis 
 	Rcpp::DoubleVector vect = Rcpp::DoubleVector::create(); 
 	Rcpp::DoubleVector Gypsum = Rcpp::DoubleVector::create(); 
 	Rcpp::DoubleVector GypsumDay = Rcpp::DoubleVector::create(); 
@@ -114,18 +113,14 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 	initVector(YearMaxGyp);
 	initVector(gypDepth);
 	initVector(YearCa);
-	initVector(YearSulfate);
-	
-	Gypsum.erase(0, Gypsum.length());
-	
+	initVector(YearSulfate);	
+	Gypsum.erase(0, Gypsum.length());	
 	Rcout.precision(10);
-	/*std::ofstream myfile;
-	myfile.open("example.csv");
-	myfile << "day,compartment, daily rain [L], dialy AET[L],moistutre [L], input Ca [mol/L], input SO4 [mol/L], input gyp [mol/L], output Ca [mol/L], output SO4 [mol/L], output gyp [mol/L].\n";
-*/
+	
 	nNumOfDays =   std::min(nNumOfDays, nRainVecLength);
 	Rcpp::Rcout << nNumOfDays << endl;
-	//main loop over days
+
+	//main loop over days, daily iteration of water balance and chemical calculation
 	for (int day = 0; ((day < nNumOfDays)); day++)
 	{
 		year = day / 365;
@@ -135,15 +130,16 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			DustComp = updateFieldCapacity(year);
 		}
 
+		// init dayli values
 		nDailyPET = PET[day]/10; 
 		nDailyRain = RainArr[day]/10;
 		DailySO4Rain = nDailyRain * 0.001*rainSO4 / 1000 / 96.06F;// convert cm3 to littre and multiple with concentration to get mg sulfate, convert to gram and multiply by atomic mass, to get mol
 		DailyCaRain = nDailyRain * 0.001*rainCa / 1000 / 40.078F;// convert cm3 to littre and multiple with concentration
 
+		//aggregate  calcium
 		inputCa += DailyCaRain;
 		
-		/*nTotalCaDust += nDust;
-		nTotalCaRain += RainArr[day] * CCa*40.0 / 1000.0;*/
+		// Actual evaporation
 		if (nTotalMoist >= (0.546*nTotalWhc)) // according to Marion et al. (1985), for the upper 45% of the total whc the actual evapotranspiration (AET) is the potential evapotranspiration (pet)
 			AET = nDailyPET;		// in case of 10 compartments of 10 cm each, if total moistute > 8.465 
 														//AET=PETdaily[monthperday[day]];
@@ -153,13 +149,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		else{// in case the soil is at WP, no evaporation
 			AET = 0;
 		}
-		//if (AET == 0 && nDailyRain == 0) continue;
-		//Rcpp::Rcout << nTotalMoist << endl << nTotalWP << endl << nTotalWhc<<endl<<AET<<endl;
+		
 		nTotalMoist = 0;
+
+		//apply AET factor
 		AET *= AETFactor;
 		
 		nDailyAET = AET;
-		//AET = AET * 10;
 		nTotalAet += nDailyAET;
 		
 		nTotalRain += nDailyRain;
@@ -184,7 +180,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		fDailyMaxGyp = 0;
 		nCurrentMaxGyp = 0;
 
-		// This is the second loop that runs through the soil profile
+		// This is the second loop that runs through the soil profile. calculate water balance
 		for (int CurrentComp = 0; CurrentComp < nNumOfCompatments; CurrentComp++)
 		{
 
@@ -240,29 +236,23 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 			}										
 			
-
+			// save the maximug gypsum horizon
 			if (Compartments[CurrentComp].C_CaSO4 > fDailyMaxGyp) {
 				fDailyMaxGyp = Compartments[CurrentComp].C_CaSO4;
 				nCurrentMaxGyp = CurrentComp;
 			}
 
-
+			//Save annual gypsm accumulation
 			if (firstDayInYear(day)) {
-				//YearGyp[year] += mol2meqSoil(Compartments[CurrentComp].C_CaSO4, thick)/nNumOfCompatments;
 				YearCa[year] += mol2meqSoil(Compartments[CurrentComp].C_Ca, thick);;
-				//YearSulfate[year] += mol2meqSoil(Compartments[CurrentComp].C_SO4, thick);
+
 				// get gypsum horizon of the year
 				if (Compartments[CurrentComp].C_CaSO4 > YearMaxGyp[year])
 				{
 					YearMaxGyp[year] = mol2meqSoil(Compartments[CurrentComp].C_CaSO4,thick);
 				}
 			}
-				//	myfile << day << "," << CurrentComp << "," << nDailyRain * 0.001 << "," << nDailyAET * 0.001 << "," << Compartments[CurrentComp].nMoist * 0.001 << "," << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) <<",";
 
-		
-		//	myfile << Compartments[CurrentComp].C_Ca / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_SO4 / (Compartments[CurrentComp].nMoist * 0.001F) << "," << Compartments[CurrentComp].C_CaSO4 / (Compartments[CurrentComp].nMoist * 0.001F) << endl;
-
-			
 			//LEACHATE
 			//  examin if we reached saturation
 			if (nLeachate > 0)
@@ -297,15 +287,13 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 		// Write to output
 		
-		if (verbose == 1)
+		if (verbose == 1)//if verbose write in details and add wetting from data
 		{
 			GypsumDay.push_back(day);
 			GypsumDay.push_back(nDailyRain);
 			GypsumDay.push_back(nDailyAET);
 			GypsumDay.push_back(nTotalMoist);
-			GypsumDay.push_back((nWDComp + 0.5)*nthick);
-
-			
+			GypsumDay.push_back((nWDComp + 0.5)*nthick);			
 			WD.push_back(day);		
 			WD.push_back(nDailyRain);	
 			WD.push_back(nDailyAET);			
@@ -317,7 +305,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 			}
 			
 		}
-		else if (nDailyRain > 0)
+		else if (nDailyRain > 0)//Else minimise output
 		{
 			nRainEvents++;
 			Compartments[nWDComp].nWetCount++;				
@@ -325,7 +313,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 		}
 		
 		nWDComp = 0;
-		
+
+		//status bar
 		if (fmod(double(day)/ double(nNumOfDays), 0.1 )  == 0) {
 			Rcout << double(day) / double(nNumOfDays) * 100 << "%; ";
 		}
@@ -333,6 +322,7 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 	}
 
+	// save all compartment data to output data
 	for (std::vector<Compartment>::iterator it = Compartments.begin(); it != Compartments.end(); ++it) {
 		//convert to meq/100 g soi;; first convert to mol with the moist and then to mmol and then multiply by 100/BDensity = 69
 		vect.push_back(it->nWetCount);
@@ -350,19 +340,8 @@ Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int y
 
 	outputCa += nTotalCaLeachate;
 	Rcpp::Rcout << WD.length() << verbose<< endl;
-
-	//myfile.close();
 	
-	/*Rcout << "total moist in soil: " << nTotalMoist << endl <<
-		"total leachate: " << nLeachate << endl <<
-		"total rain: " << nTotalRain << endl <<
-		"total AET: " << nTotalAet << endl <<
-		"balance: " << nTotalRain - nLeachate - nTotalMoist - nInitMoistTotal - nTotalAet << endl <<
-		"rain events: " << nRainEvents <<  endl;*/
-	/*Gypsum.attr("dim") = Dimension(20, Gypsum.length() / (20));
-	NumericMatrix GypsumMat = transpose(as<NumericMatrix>(Gypsum));*/
-
-	
+	//Export to R wrapper
 	results = Rcpp::List::create(_["gypsum"] = Gypsum, _["gypsumDay"] = output2Matrix(GypsumDay, verbose),
 		_["Ca"] = Ca,
 		_["SO4"] = SO4,
@@ -441,11 +420,8 @@ double CSM::GetPrecision(double x)
 	return(((int)(x*10000.0)) / 10000.0F);
 }
 
-//Rcpp::List CSM::GetResults()
-//{
-//	return results;
-//}
 
+// call constractor for compartments
 void CSM::InitCompartments()
 {
 	if (Compartments.size() > 0) {
@@ -467,16 +443,7 @@ void CSM::initVector(Rcpp::DoubleVector & inputVector)
 	}
 }
 
-
-
-
-	
-
-
-
-
-
-
+//export ethods to R wrapper
 
 // [[Rcpp::plugins(cpp11)]]
 RCPP_MODULE(CSM_MODULE) {
