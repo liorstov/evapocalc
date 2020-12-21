@@ -30,9 +30,24 @@ CSM::CSM()
 	printf("csm Const\n");
 }
 
-//Main function of the model. called by the R wrapper
-//flux is gram/cm2/day
-//dust concentration is mg/gram; rain concentration is mg/l
+/**
+	Main function of the model. called by the R wrapper
+	rain- rain series from weather generator
+	PET - evaporation series from weather generator
+	years - computation duration 
+	Deth - of soil profile
+	nthick-compartment thickness 
+	Wieltingpoint - residual water [cm3/cm3]
+	FieldArea - area of profile usually 1
+	FieldCapacity - maximal water holding [cm3/cme]
+	DustGyp - gypsum in dust
+	AETFactor - evaporation factor
+	verbose
+	dustFlux - annual dust flux [gr/cm2/year] 
+	rainCa - Calcium concentration in rain
+	rainSO4 - sulfate concentration in rain
+	withFC - activate FC module
+*/
 Rcpp::List CSM::Calculate(Rcpp::DoubleVector rain, Rcpp::DoubleVector PET, int years, int Depth, int nthick, double WieltingPoint,
 	int FieldArea, double FieldCapacity, double DustGyp, double AETFactor, bool verbose, double dustFlux, double rainCa, double rainSO4,bool withFC)
 {
