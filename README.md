@@ -11,8 +11,8 @@ Calgyp is a model designed to calculate the the concentration and dispersion of 
 ## Operation
 
  1. Weather Generator  
-	+ This section is responsible for creating a daily rainfall series of custom length which represents the statistical climate properties in a selected meteorological station.  
-	 + *evapostats\RainGen.R*: Is responsible for getting the meteorological data from the IMS using *GetImsRain()* and generate the wet and dry days probabilities using markov chain algorithm    in *CalculateProbabilities()*. The *GenerateRainSeries(numOfSeries)* function generates the costume length series.
+	+ This section is responsible for creating a daily rainfall series of predefined length which represents the statistical climate properties in a selected meteorological station.  
+	 + *evapostats\RainGen.R*: Is responsible for getting the meteorological data from the IMS using *GetImsRain()* and generate the wet and dry days probabilities using markov chain algorithm    in *CalculateProbabilities()*. The *GenerateRainSeries(numOfSeries)* function generates a series of desired length.
 	 
 	 this code creates daily rain from a weibull distribution:
 	 
