@@ -35,8 +35,8 @@ WG results for Eilat station
 
  2. Soil hydrological model  C++
 	A c++ model which simulate a soil column divided into compartments of a specified thickness.   Every iteration represents a daily routine of moisture addition and evaporation according to the daily rain ane potential evaporation supplied by the weather generator. The model is located in the *Calcyp* directory
-	 - [Calcyp\CSM.cpp](Calcyp\CSM.cpp) - The main function is  *CSM::Calculate()* responsible for calculating the daily water balance. Distribute the moisture between the compartments represent the soil profile. 
-	 - [Calcyp\Compartment.cpp](Calcyp\Compartment.cpp) - represent a compartment object. The properties of the compartment are soil parameters, moisture, and gypsum concentration. *Compartment::solubility()* calculates the equilibrium and return the accumulated gypsum
+	 - [Calcyp/CSM.cpp](Calcyp/CSM.cpp) - The main function is  *CSM::Calculate()* responsible for calculating the daily water balance. Distribute the moisture between the compartments represent the soil profile. 
+	 - [Calcyp/Compartment.cpp](Calcyp/Compartment.cpp) - represent a compartment object. The properties of the compartment are soil parameters, moisture, and gypsum concentration. *Compartment::solubility()* calculates the equilibrium and return the accumulated gypsum
 	 
 	 
 ![](plots/oper.png) 
